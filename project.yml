@@ -11,12 +11,12 @@ targets:
     type: application
     platform: iOS
     sources:
-      - path: .
-        excludes:
-          - .github
-          - README.md
-          - project.yml
-          - "*.md"
+      - path: 51App.swift
+      - path: AI
+      - path: Export
+      - path: Models
+      - path: Sync
+      - path: Views
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.shiqixiaoyao.fiftyone
