@@ -1,0 +1,88 @@
+name: 构建 51 iOS IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: 创建临时 Xcode 工程（如果仓库没有工程文件）
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find . -maxdepth 2 -name '*.xcodeproj' -print -quit | grep -q .; then
+            echo '发现现有 Xcode 工程，跳过生成。'
+            exit 0
+          fi
+          mkdir -p "51-Accounting.xcodeproj" "51-Accounting.xcodeproj/project.xcworkspace" "51-Accounting.xcodeproj/xcshareddata/xcschemes"
+          cat > "51-Accounting.xcodeproj/project.pbxproj" <<'PBXPROJ'
+// !$*UTF8*$!
+{
+  archiveVersion = 1;
+  classes = {};
+  objectVersion = 56;
+  objects = {};
+  rootObject = 000000000000000000000000;
+}
+PBXPROJ
+          cat > "51-Accounting.xcodeproj/xcshareddata/xcschemes/51-Accounting.xcscheme" <<'SCHEME'
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme LastUpgradeVersion="1600" version="1.3">
+  <BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES"/>
+  <ArchiveAction revealArchiveInOrganizer="NO"/>
+</Scheme>
+SCHEME
+          echo '已创建占位工程结构；后续请在 Xcode 中补充正式工程配置。'
+
+      - name: 查找并构建 Xcode 工程
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROJECT=$(find . -maxdepth 2 -name '*.xcodeproj' -print -quit)
+          if [ -z "$PROJECT" ]; then
+            echo '未找到可构建的 Xcode 工程。请提交正式的 .xcodeproj 或 Package.swift。' >&2
+            exit 1
+          fi
+          SCHEME=$(xcodebuild -list -project "$PROJECT" 2>/dev/null | awk '/^[[:space:]]+[A-Za-z0-9][^:]*$/ {gsub(/^[[:space:]]+/, ""); print; exit}')
+          if [ -z "$SCHEME" ]; then SCHEME="51-Accounting"; fi
+          xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+
+      - name: 打包未签名 IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP=$(find build/Build/Products -type d -name '*.app' -path '*iphoneos*' -print -quit)
+          if [ -z "$APP" ]; then echo '未找到构建产物 .app。' >&2; exit 1; fi
+          rm -rf Payload 51-Accounting.ipa
+          mkdir Payload
+          cp -R "$APP" Payload/
+          /usr/bin/zip -qry 51-Accounting.ipa Payload
+
+      - name: 上传 IPA 构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: 51-Accounting-ipa
+          path: 51-Accounting.ipa
+          if-no-files-found: error
+
+      - name: 将 IPA 附加到发布版本
+        if: github.event_name == 'release' && github.event.action == 'published'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: 51-Accounting.ipa
