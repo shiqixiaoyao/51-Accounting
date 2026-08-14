@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 /// AI 生成的交易提案，保存前必须由用户在中文界面确认。
 struct TransactionProposal: Codable, Identifiable {
