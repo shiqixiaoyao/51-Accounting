@@ -115,6 +115,12 @@ struct AccountingAppShortcuts: AppShortcutsProvider {
             systemImageName: "sparkles"
         )
         AppShortcut(
+            intent: OpenNewTransactionIntent(),
+            phrases: ["在\(.applicationName)打开新增记账"],
+            shortTitle: "新增记账",
+            systemImageName: "square.and.pencil"
+        )
+        AppShortcut(
             intent: BackupToCloudIntent(),
             phrases: ["在\(.applicationName)备份账务数据"],
             shortTitle: "云端备份",
