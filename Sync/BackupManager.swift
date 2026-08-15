@@ -50,7 +50,7 @@ enum WebDAVSettingsStore {
 
     static func load() throws -> WebDAVConfiguration {
         migrateLegacyCredential()
-        try makeConfiguration(
+        return try makeConfiguration(
             endpointText: UserDefaults.standard.string(forKey: endpointKey) ?? "",
             username: UserDefaults.standard.string(forKey: usernameKey) ?? "",
             password: KeychainStore.read(passwordKey) ?? ""

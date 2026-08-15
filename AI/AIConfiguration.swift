@@ -29,7 +29,7 @@ enum AIConfigurationStore {
 
     static func load() throws -> AIServiceConfiguration {
         migrateLegacyCredential()
-        try makeConfiguration(
+        return try makeConfiguration(
             provider: AIProvider(rawValue: UserDefaults.standard.string(forKey: providerKey) ?? "") ?? .poke,
             endpointText: UserDefaults.standard.string(forKey: endpointKey) ?? "",
             apiKey: KeychainStore.read(apiKeyKey) ?? ""
