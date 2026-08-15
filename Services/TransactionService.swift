@@ -22,10 +22,6 @@ struct TransactionService {
         }
     }
 
-    static func create(date: Date = .now, payee: String, note: String = "", currencyCode: String = "CNY", source: String = "手动", postings: [Posting], context: ModelContext) throws -> BookkeepingTransaction {
-        try create(date: date, payee: payee, note: note, currencyCode: currencyCode, source: source, postings: postings, in: context)
-    }
-
     static func balance(for account: Account, transactions: [BookkeepingTransaction]) -> Decimal {
         let names = Set([account.name, account.ledgerName, account.ledgerName.replacingOccurrences(of: "Assets:", with: ""), account.ledgerName.replacingOccurrences(of: "Liabilities:", with: "")])
         let movement = transactions.flatMap(\.postings).filter { names.contains($0.accountName) }.reduce(Decimal.zero) { $0 + $1.amount }
