@@ -1,0 +1,23 @@
+included:
+  - 51App.swift
+  - AI
+  - Export
+  - Models
+  - Services
+  - Security
+  - Sync
+  - Views
+excluded:
+  - Tests
+line_length:
+  warning: 180
+  error: 240
+function_body_length:
+  warning: 120
+  error: 240
+type_body_length:
+  warning: 400
+  error: 600
+disabled_rules:
+  - trailing_whitespace
+  - identifier_name
