@@ -63,22 +63,23 @@ jobs:
             test-build.log
             test.log
           if-no-files-found: ignore
-      - name: Build
+      - name: Build app for device
         run: |
           set -euxo pipefail
+          rm -rf build
           xcodebuild clean build \
             -project Accounting51.xcodeproj \
-            -scheme Accounting51 \
+            -target Accounting51 \
             -destination 'generic/platform=iOS' \
             -configuration Release \
             -derivedDataPath build \
             CODE_SIGN_IDENTITY='' \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
+          test -d build/Build/Products/Release-iphoneos/Accounting51.app
       - name: Package IPA
         run: |
           set -euxo pipefail
-          test -d build/Build/Products/Release-iphoneos/Accounting51.app
           mkdir -p build/Payload
           cp -R build/Build/Products/Release-iphoneos/Accounting51.app build/Payload/
           cd build
