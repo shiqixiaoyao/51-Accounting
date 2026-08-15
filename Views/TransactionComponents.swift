@@ -3,29 +3,40 @@ import SwiftUI
 struct TransactionRow: View {
     let transaction: BookkeepingTransaction
 
-    private var primaryPosting: Posting? {
-        transaction.postings.first
-    }
+    private var primaryPosting: Posting? { transaction.postings.first }
 
     var body: some View {
         HStack(spacing: 12) {
-            GradientIcon(systemName: "arrow.left.arrow.right", colors: [.cyan, .blue])
-            VStack(alignment: .leading, spacing: 4) {
+            GradientIcon(systemName: "arrow.left.arrow.right", colors: amountColorPair)
+            VStack(alignment: .leading, spacing: 5) {
                 Text(transaction.payee.isEmpty ? "未命名交易" : transaction.payee)
-                    .font(.headline)
-                    .lineLimit(1)
-                Text(transaction.date, format: .dateTime.month().day())
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.headline).lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(transaction.date, format: .dateTime.month().day())
+                    Text("·")
+                    Text(transaction.source)
+                }
+                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
-            Spacer()
+            Spacer(minLength: 10)
             if let primaryPosting {
-                Text(NSDecimalNumber(decimal: primaryPosting.amount).stringValue)
-                    .font(.body.monospacedDigit())
-                    .foregroundStyle(primaryPosting.amount >= 0 ? .green : .orange)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("\(primaryPosting.amount >= 0 ? "+" : "")¥\(MoneyInput.display(primaryPosting.amount))")
+                        .font(.body.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(primaryPosting.amount >= 0 ? .mint : .orange)
+                    Text(primaryPosting.amount >= 0 ? "流入" : "流出")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
             }
         }
+        .padding(.vertical, 4)
         .contentShape(Rectangle())
+    }
+
+    private var amountColorPair: [Color] {
+        guard let primaryPosting else { return [.cyan, .blue] }
+        return primaryPosting.amount >= 0 ? [.mint, .cyan] : [.orange, .pink]
     }
 }
 
@@ -35,22 +46,31 @@ struct TransactionDetailView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("交易信息") {
-                    LabeledContent("商户", value: transaction.payee)
-                    LabeledContent("日期", value: transaction.date.formatted(date: .long, time: .shortened))
-                    if !transaction.note.isEmpty {
-                        LabeledContent("备注", value: transaction.note)
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(transaction.payee.isEmpty ? "未命名交易" : transaction.payee).font(.title3.bold())
+                        Text(transaction.date.formatted(date: .long, time: .shortened)).font(.subheadline).foregroundStyle(.secondary)
                     }
-                    LabeledContent("来源", value: transaction.source)
+                    .padding(.vertical, 6)
                 }
-                Section("分录") {
+                Section("交易信息") {
+                    LabeledContent("来源", value: transaction.source)
+                    if !transaction.note.isEmpty { LabeledContent("备注", value: transaction.note) }
+                }
+                Section("平衡分录") {
                     ForEach(transaction.postings) { posting in
-                        HStack {
-                            Text(posting.accountName)
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(posting.accountName).font(.subheadline.weight(.medium))
+                                Text(posting.amount >= 0 ? "借方 / 流入" : "贷方 / 流出")
+                                    .font(.caption2).foregroundStyle(.secondary)
+                            }
                             Spacer()
-                            Text(NSDecimalNumber(decimal: posting.amount).stringValue)
-                                .monospacedDigit()
+                            Text("\(posting.amount >= 0 ? "+" : "")¥\(MoneyInput.display(posting.amount))")
+                                .font(.subheadline.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(posting.amount >= 0 ? .mint : .orange)
                         }
+                        .padding(.vertical, 4)
                     }
                 }
             }

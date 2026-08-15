@@ -4,9 +4,22 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    HStack(spacing: 14) {
+                        GradientIcon(systemName: "books.vertical.fill", colors: [.cyan, .mint])
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("51 记账").font(.headline)
+                            Text("复式账本 · 本地优先 · 可选云端备份")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                }
+                .listRowBackground(Color.clear)
+
                 Section("智能记账") {
-                    NavigationLink { AIServiceSettingsView() } label: { Label("绯儿 / AI 记账服务", systemImage: "sparkles") }
-                    NavigationLink { QuickAddAIView(preferredProvider: .poke) } label: { Label("打开绯儿智能记账", systemImage: "bubble.left.and.bubble.right") }
+                    NavigationLink { AIServiceSettingsView() } label: { settingLabel("绯儿 / AI 记账服务", icon: "sparkles", tint: .cyan) }
+                    NavigationLink { QuickAddAIView(preferredProvider: .poke) } label: { settingLabel("打开绯儿智能记账", icon: "wand.and.stars", tint: .mint) }
                 }
                 Section("账户与数据") {
                     NavigationLink("账户管理") { AccountManagementView() }
@@ -17,5 +30,9 @@ struct SettingsView: View {
             }
             .navigationTitle("设置")
         }
+    }
+
+    private func settingLabel(_ title: String, icon: String, tint: Color) -> some View {
+        Label { Text(title) } icon: { Image(systemName: icon).foregroundStyle(tint) }
     }
 }

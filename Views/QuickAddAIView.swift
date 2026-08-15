@@ -10,56 +10,26 @@ struct QuickAddAIView: View {
     @State private var savedMessage: String?
     let preferredProvider: AIProvider?
 
-    init(preferredProvider: AIProvider? = nil) {
-        self.preferredProvider = preferredProvider
-    }
+    init(preferredProvider: AIProvider? = nil) { self.preferredProvider = preferredProvider }
 
-    private var activeProvider: AIProvider {
-        preferredProvider ?? AIConfigurationStore.selectedProvider()
-    }
-
-    private var title: String {
-        activeProvider == .poke ? "绯儿智能记账" : "\(activeProvider.rawValue) 智能记账"
-    }
+    private var activeProvider: AIProvider { preferredProvider ?? AIConfigurationStore.selectedProvider() }
+    private var title: String { activeProvider == .poke ? "绯儿智能记账" : "\(activeProvider.rawValue) 智能记账" }
+    private var canParse: Bool { !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !manager.isLoading }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.black.ignoresSafeArea()
-                ScrollView {
+                AppBackdrop(accent: .cyan)
+                ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 18) {
-                        Text(title).font(.largeTitle.bold())
-                        Text("用自然语言描述收支，\(activeProvider.rawValue) 会生成需确认的平衡分录。请先在设置中完成 Endpoint、Model 与 API Key 的连接测试。")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        TextEditor(text: $text)
-                            .frame(minHeight: 130)
-                            .padding(8)
-                            .background(.background, in: RoundedRectangle(cornerRadius: 12))
-
-                        Button(action: parse) {
-                            if manager.isLoading { HStack { ProgressView(); Text("正在解析") } }
-                            else { Label("使用 \(activeProvider == .poke ? "绯儿" : activeProvider.rawValue) 生成待确认分录", systemImage: "sparkles") }
-                        }
-                        .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || manager.isLoading)
-
-                        if let proposal {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text("解析结果：\(proposal.payee)").font(.headline)
-                                LabeledContent("置信度") { Text("\(Int((proposal.confidence * 100).rounded()))%").monospacedDigit() }
-                                ForEach(proposal.postings) { posting in
-                                    LabeledContent(posting.account) { Text("\(MoneyInput.display(posting.amount)) \(proposal.currencyCode)").monospacedDigit() }
-                                }
-                                Button("确认并保存") { save(proposal) }
-                            }
-                            .padding()
-                            .background(.background, in: RoundedRectangle(cornerRadius: 14))
-                        }
-
-                        if let savedMessage { Text(savedMessage).foregroundStyle(.green) }
-                        if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+                        header
+                        inputCard
+                        if let proposal { proposalCard(proposal) }
+                        if let savedMessage { InlineStatusCard(text: savedMessage, systemImage: "checkmark.circle.fill", tint: .mint) }
+                        if let errorMessage { InlineStatusCard(text: errorMessage, systemImage: "exclamationmark.triangle.fill", tint: .red) }
                     }
-                    .padding()
+                    .padding(18)
+                    .padding(.bottom, 24)
                 }
             }
             .navigationTitle("AI 记账")
@@ -70,10 +40,93 @@ struct QuickAddAIView: View {
         }
     }
 
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.system(size: 30, weight: .bold, design: .rounded))
+            HStack(spacing: 8) {
+                Image(systemName: "wand.and.stars").foregroundStyle(.cyan)
+                Text("描述收支，预览平衡分录，再确认写入账本。")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            Text(activeProvider.rawValue)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.cyan)
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(.cyan.opacity(0.13), in: Capsule())
+        }
+    }
+
+    private var inputCard: some View {
+        GlassCard(tint: .cyan) {
+            VStack(alignment: .leading, spacing: 14) {
+                Label("用一句话描述", systemImage: "text.bubble.fill")
+                    .font(.headline)
+                TextEditor(text: $text)
+                    .frame(minHeight: 132)
+                    .padding(10)
+                    .scrollContentBackground(.hidden)
+                    .background(.black.opacity(0.20), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay { RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(.white.opacity(0.10), lineWidth: 1) }
+                Text("例如：午餐 36.50 元，用建行卡支付。")
+                    .font(.footnote).foregroundStyle(.secondary)
+                examplePrompts
+                PrimaryActionButton(
+                    title: manager.isLoading ? "正在解析" : "生成待确认分录",
+                    systemImage: manager.isLoading ? "hourglass" : "sparkles",
+                    isDisabled: !canParse,
+                    action: parse
+                )
+            }
+        }
+    }
+
+    private var examplePrompts: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(["午餐 36.50 元，用建行卡支付", "收到工资 12,000 元，存入工资卡", "从建行转 500 元到支付宝"], id: \.self) { example in
+                    Button(example) { text = example }
+                        .font(.caption)
+                        .foregroundStyle(.cyan)
+                        .padding(.horizontal, 10).padding(.vertical, 8)
+                        .background(.cyan.opacity(0.10), in: Capsule())
+                        .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func proposalCard(_ proposal: TransactionProposal) -> some View {
+        GlassCard(tint: .mint) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Label("待确认分录", systemImage: "checkmark.seal.fill").font(.headline).foregroundStyle(.mint)
+                    Spacer()
+                    Text("置信度 \(Int((proposal.confidence * 100).rounded()))%")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                }
+                Text(proposal.payee).font(.title3.weight(.bold))
+                VStack(spacing: 0) {
+                    ForEach(Array(proposal.postings.enumerated()), id: \.element.id) { index, posting in
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            Text(posting.account).font(.subheadline).lineLimit(1)
+                            Spacer()
+                            Text("\(posting.amount >= 0 ? "+" : "")\(MoneyInput.display(posting.amount)) \(proposal.currencyCode)")
+                                .font(.subheadline.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(posting.amount >= 0 ? .mint : .orange)
+                        }
+                        .padding(.vertical, 10)
+                        if index < proposal.postings.count - 1 { Divider().overlay(.white.opacity(0.10)) }
+                    }
+                }
+                Text("分录已通过金额平衡与两位小数校验。确认后将写入账本。")
+                    .font(.footnote).foregroundStyle(.secondary)
+                PrimaryActionButton(title: "确认并保存", systemImage: "checkmark.circle.fill") { save(proposal) }
+            }
+        }
+    }
+
     private func parse() {
-        errorMessage = nil
-        savedMessage = nil
-        proposal = nil
+        errorMessage = nil; savedMessage = nil; proposal = nil
         Task {
             do { proposal = try await manager.parse(text: text, provider: preferredProvider) }
             catch { errorMessage = error.localizedDescription }

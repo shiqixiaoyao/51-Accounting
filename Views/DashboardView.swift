@@ -5,13 +5,147 @@ struct DashboardView: View {
     @Binding var showingAdd: Bool
     @Query(sort: \BookkeepingTransaction.date, order: .reverse) private var transactions: [BookkeepingTransaction]
     @Query private var accounts: [Account]
+
     init(showingAdd: Binding<Bool> = .constant(false)) { _showingAdd = showingAdd }
+
     private var totalAssets: Decimal { BalanceCalculator.totalAssets(accounts: accounts, transactions: transactions) }
     private var totalLiabilities: Decimal { BalanceCalculator.totalLiabilities(accounts: accounts, transactions: transactions) }
     private var netAssets: Decimal { BalanceCalculator.netAssets(accounts: accounts, transactions: transactions) }
-    var body: some View { NavigationStack { ZStack(alignment: .bottomTrailing) { Color.black.ignoresSafeArea(); LinearGradient(colors: [.cyan.opacity(0.16), .blue.opacity(0.08), .black], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea(); ScrollView(showsIndicators: false) { VStack(alignment: .leading, spacing: 18) { header; summaryCard; accountsCard; transactionsCard }.padding(18) }; Button { showingAdd = true } label: { Image(systemName: "plus").font(.title2.weight(.bold)).foregroundStyle(.black).frame(width: 60, height: 60).background(LinearGradient(colors: [.cyan, .mint], startPoint: .topLeading, endPoint: .bottomTrailing), in: Circle()) }.padding(24) }.toolbar(.hidden, for: .navigationBar) } }
-    private var header: some View { HStack(alignment: .bottom) { VStack(alignment: .leading, spacing: 5) { Text("今天也记得记一笔").font(.subheadline.weight(.medium)).foregroundStyle(.secondary); Text("51 账本").font(.system(size: 34, weight: .bold, design: .rounded)) }; Spacer(); Image(systemName: "waveform.path.ecg").foregroundStyle(.cyan).padding(12).background(.ultraThinMaterial, in: Circle()) } }
-    private var summaryCard: some View { GlassCard(tint: .cyan) { VStack(alignment: .leading, spacing: 14) { Label("净资产", systemImage: "chart.line.uptrend.xyaxis").foregroundStyle(.secondary); Text("¥\(NSDecimalNumber(decimal: netAssets).stringValue)").font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit()); HStack { Text("资产 ¥\(NSDecimalNumber(decimal: totalAssets).stringValue)"); Spacer(); Text("负债 ¥\(NSDecimalNumber(decimal: totalLiabilities).stringValue)") }.font(.caption.monospacedDigit()).foregroundStyle(.secondary) } } }
-    private var accountsCard: some View { GlassCard(tint: .purple) { VStack(alignment: .leading, spacing: 14) { Label("账户余额", systemImage: "wallet.pass.fill").font(.headline).foregroundStyle(.purple); ForEach(accounts.prefix(3)) { account in HStack { Text(account.name); Spacer(); Text(NSDecimalNumber(decimal: BalanceCalculator.balance(for: account, transactions: transactions)).stringValue).monospacedDigit() } } } } }
-    private var transactionsCard: some View { GlassCard(tint: .orange) { VStack(alignment: .leading, spacing: 14) { Label("最近记账", systemImage: "clock.arrow.circlepath").font(.headline).foregroundStyle(.orange); if transactions.isEmpty { Text("点击右下角“＋”，记录第一笔交易").foregroundStyle(.secondary) } else { ForEach(transactions.prefix(5)) { TransactionRow(transaction: $0) } } } } }
+
+    var body: some View {
+        NavigationStack {
+            ZStack(alignment: .bottomTrailing) {
+                AppBackdrop(accent: .cyan)
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 20) {
+                        header
+                        summaryCard
+                        accountsCard
+                        transactionsCard
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 14)
+                    .padding(.bottom, 102)
+                }
+                Button { showingAdd = true } label: {
+                    Label("记一笔", systemImage: "plus")
+                        .font(.headline)
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 15)
+                        .background(
+                            LinearGradient(colors: [.cyan, .mint], startPoint: .topLeading, endPoint: .bottomTrailing),
+                            in: Capsule()
+                        )
+                        .shadow(color: .cyan.opacity(0.26), radius: 14, y: 8)
+                }
+                .buttonStyle(.plain)
+                .padding(22)
+            }
+            .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .bottom, spacing: 14) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("财务概览")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.cyan)
+                Text("今天也记得记一笔")
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            GradientIcon(systemName: "waveform.path.ecg", colors: [.cyan, .mint])
+        }
+    }
+
+    private var summaryCard: some View {
+        GlassCard(tint: .cyan) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Label("净资产", systemImage: "chart.line.uptrend.xyaxis")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("实时计算")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.cyan)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(.cyan.opacity(0.14), in: Capsule())
+                }
+                Text("¥\(MoneyInput.display(netAssets))")
+                    .font(.system(size: 38, weight: .bold, design: .rounded).monospacedDigit())
+                    .minimumScaleFactor(0.72)
+                HStack(spacing: 12) {
+                    summaryMetric(title: "资产", amount: totalAssets, tint: .mint)
+                    summaryMetric(title: "负债", amount: totalLiabilities, tint: .orange)
+                }
+            }
+        }
+    }
+
+    private func summaryMetric(title: String, amount: Decimal, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text("¥\(MoneyInput.display(amount))")
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .foregroundStyle(tint)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var accountsCard: some View {
+        GlassCard(tint: .indigo) {
+            VStack(alignment: .leading, spacing: 14) {
+                sectionTitle("账户余额", icon: "wallet.pass.fill", tint: .indigo, trailing: accounts.isEmpty ? nil : "\(accounts.count) 个账户")
+                if accounts.isEmpty {
+                    emptyLine("还没有账户，记账时可直接添加第一个账户。", icon: "wallet.pass")
+                } else {
+                    ForEach(accounts.prefix(3)) { account in
+                        HStack(spacing: 10) {
+                            Circle().fill(.indigo.opacity(0.78)).frame(width: 7, height: 7)
+                            Text(account.selectionLabel).lineLimit(1)
+                            Spacer()
+                            Text("¥\(MoneyInput.display(BalanceCalculator.balance(for: account, transactions: transactions)))")
+                                .font(.subheadline.weight(.semibold).monospacedDigit())
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var transactionsCard: some View {
+        GlassCard(tint: .orange) {
+            VStack(alignment: .leading, spacing: 14) {
+                sectionTitle("最近记账", icon: "clock.arrow.circlepath", tint: .orange, trailing: transactions.isEmpty ? nil : "最近 5 笔")
+                if transactions.isEmpty {
+                    emptyLine("从“记一笔”开始，让账本有第一条记录。", icon: "square.and.pencil")
+                } else {
+                    ForEach(transactions.prefix(5)) { TransactionRow(transaction: $0) }
+                }
+            }
+        }
+    }
+
+    private func sectionTitle(_ title: String, icon: String, tint: Color, trailing: String?) -> some View {
+        HStack {
+            Label(title, systemImage: icon).font(.headline).foregroundStyle(tint)
+            Spacer()
+            if let trailing { Text(trailing).font(.caption).foregroundStyle(.secondary) }
+        }
+    }
+
+    private func emptyLine(_ text: String, icon: String) -> some View {
+        Label(text, systemImage: icon)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .padding(.vertical, 4)
+    }
 }
