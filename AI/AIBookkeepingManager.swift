@@ -58,7 +58,7 @@ final class AIBookkeepingManager: ObservableObject {
     }
 
     var apiKey: String {
-        KeychainService.read("aiAPIKey") ?? ""
+        KeychainStore.read("aiAPIKey") ?? ""
     }
 
     func parse(text: String) async throws -> TransactionProposal {
