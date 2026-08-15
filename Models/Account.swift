@@ -14,30 +14,53 @@ final class Account {
 
     var type: AccountType {
         get { AccountType(rawValue: typeRawValue) ?? .asset }
-        set { typeRawValue = newValue.rawValue; isLiability = newValue == .liability }
+        set {
+            typeRawValue = newValue.rawValue
+            isLiability = newValue == .liability
+        }
     }
 
+    /// The canonical Beancount account path. User-entered names may be either
+    /// leaf names ("Bank") or already-qualified paths ("Assets:Bank").
+    /// A qualified path is preserved; a leaf is classified from the account type.
     var ledgerName: String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "Assets:Cash" }
         if trimmed.contains(":") { return trimmed }
-        switch type {
-        case .asset: return "Assets:\(trimmed)"
-        case .liability: return "Liabilities:\(trimmed)"
-        case .equity: return "Equity:\(trimmed)"
-        case .income: return "Income:\(trimmed)"
-        case .expense: return "Expenses:\(trimmed)"
-        }
+        return "\(type.ledgerPrefix):\(trimmed)"
     }
 
     init(name: String, type: AccountType, currencyCode: String = "CNY", openingBalance: Decimal = 0, isLiability: Bool? = nil) {
-        id = UUID(); self.name = name.trimmingCharacters(in: .whitespacesAndNewlines); typeRawValue = type.rawValue; self.currencyCode = currencyCode; self.openingBalance = openingBalance.roundedToCents; self.isLiability = isLiability ?? (type == .liability); createdAt = .now
+        id = UUID()
+        self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        typeRawValue = type.rawValue
+        self.currencyCode = currencyCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        self.openingBalance = openingBalance.roundedToCents
+        self.isLiability = isLiability ?? (type == .liability)
+        createdAt = .now
     }
 }
 
 enum AccountType: String, Codable, CaseIterable {
     case asset, liability, equity, income, expense
+
     var chineseName: String {
-        switch self { case .asset: return "资产"; case .liability: return "负债"; case .equity: return "权益"; case .income: return "收入"; case .expense: return "支出" }
+        switch self {
+        case .asset: return "资产"
+        case .liability: return "负债"
+        case .equity: return "权益"
+        case .income: return "收入"
+        case .expense: return "支出"
+        }
+    }
+
+    var ledgerPrefix: String {
+        switch self {
+        case .asset: return "Assets"
+        case .liability: return "Liabilities"
+        case .equity: return "Equity"
+        case .income: return "Income"
+        case .expense: return "Expenses"
+        }
     }
 }
