@@ -1,22 +1,22 @@
 import Foundation
 
-/// 复式记账校验：所有金额统一按人民币分厘精度校验。
+/// 复式记账校验：所有金额统一按分厘精度校验。
 struct TransactionValidator {
-    static let tolerance: Decimal = 0.01
-
     static func validate(_ transaction: BookkeepingTransaction) -> Result<Void, ValidationError> {
         validate(postings: transaction.postings)
     }
 
     static func validate(postings: [Posting]) -> Result<Void, ValidationError> {
         guard postings.count >= 2 else { return .failure(.requiresAtLeastTwoPostings) }
-        guard postings.allSatisfy({ !$0.accountName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
-            return .failure(.missingAccount)
-        }
-        guard postings.allSatisfy({ $0.amount.isFiniteDecimal && $0.amount.roundedToCents == $0 }) else {
-            return .failure(.precisionExceeded)
-        }
-        let total = postings.reduce(Decimal.zero) { $0 + $1.amount }.roundedToCents
+        guard postings.allSatisfy({ posting in
+            !posting.accountName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }) else { return .failure(.missingAccount) }
+        guard postings.allSatisfy({ posting in
+            posting.amount == posting.amount.roundedToCents
+        }) else { return .failure(.precisionExceeded) }
+        let total = postings.reduce(Decimal.zero) { partial, posting in
+            partial + posting.amount
+        }.roundedToCents
         guard total == 0 else { return .failure(.unbalanced(total: total)) }
         return .success(())
     }
@@ -36,8 +36,4 @@ struct TransactionValidator {
             }
         }
     }
-}
-
-private extension Decimal {
-    var isFiniteDecimal: Bool { NSDecimalIsNotANumber(self) == false }
 }
