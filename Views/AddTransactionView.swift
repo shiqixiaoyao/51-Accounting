@@ -164,36 +164,37 @@ struct AddTransactionView: View {
     }
 
     private func createAccount() {
-        let name = newAccountName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let currency = newAccountCurrency.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-
-        guard !name.isEmpty else {
-            accountCreationError = "请输入账户名称。"
-            return
-        }
-        guard !currency.isEmpty else {
-            accountCreationError = "请输入币种代码。"
-            return
-        }
-        guard !accounts.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
-            accountCreationError = "已存在同名账户。"
-            return
-        }
-
-        let newAccount = Account(name: name, type: newAccountType, currencyCode: currency)
-        modelContext.insert(newAccount)
-
         do {
-            try modelContext.save()
-            switch accountCreationTarget {
-            case .source:
-                account = newAccount.name
-            case .destination:
-                destination = newAccount.name
+            let draft = try AccountEntryCoordinator.makeDraft(
+                name: newAccountName,
+                type: newAccountType,
+                currencyCode: newAccountCurrency,
+                existingAccountNames: accounts.map(\.name)
+            )
+            let newAccount = Account(
+                name: draft.name,
+                type: draft.type,
+                currencyCode: draft.currencyCode
+            )
+            modelContext.insert(newAccount)
+            do {
+                try modelContext.save()
+            } catch {
+                modelContext.delete(newAccount)
+                throw error
             }
+            let selection = AccountEntryCoordinator.selecting(
+                accountNamed: newAccount.name,
+                for: accountCreationTarget,
+                from: AccountSelectionState(
+                    sourceAccountName: account,
+                    destinationAccountName: destination
+                )
+            )
+            account = selection.sourceAccountName
+            destination = selection.destinationAccountName
             isAccountCreatorPresented = false
         } catch {
-            modelContext.delete(newAccount)
             accountCreationError = error.localizedDescription
         }
     }
@@ -205,9 +206,4 @@ struct AddTransactionView: View {
         switch type { case .expense: postings = [Posting(accountName: "Expenses:\(category)", amount: value, memo: title), Posting(accountName: account, amount: -value)]; case .income: postings = [Posting(accountName: account, amount: value), Posting(accountName: "Income:\(category)", amount: -value, memo: title)]; case .transfer: postings = [Posting(accountName: destination, amount: value), Posting(accountName: account, amount: -value)] }
         do { try TransactionService.create(date: date, payee: title, note: note, postings: postings, in: modelContext); dismiss() } catch { errorMessage = error.localizedDescription }
     }
-}
-
-private enum AccountCreationTarget: Equatable {
-    case source
-    case destination
 }
