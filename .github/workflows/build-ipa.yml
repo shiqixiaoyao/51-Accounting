@@ -27,6 +27,7 @@ jobs:
           test -d Models
           test -d Sync
           test -d Views
+          test -f Info.plist
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -35,8 +36,12 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
-          rm -rf Accounting51.xcodeproj
-          if ! xcodegen generate --spec project.yml --verbose; then
+          rm -rf Accounting51.xcodeproj xcodegen.log
+          if ! xcodegen generate --spec project.yml --verbose 2>&1 | tee xcodegen.log; then
+            error_message=$(tr '\n' ' ' < xcodegen.log)
+            echo "::error title=XcodeGen failed::${error_message}"
+            echo '--- XcodeGen log ---'
+            cat xcodegen.log
             echo '--- project.yml ---'
             cat project.yml
             echo '--- source tree ---'
