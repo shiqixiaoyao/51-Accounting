@@ -10,7 +10,14 @@ struct PostingRecord: Codable { var id: UUID; var accountName: String; var amoun
 struct TransactionRecord: Codable { var id: UUID; var date: Date; var payee: String; var note: String; var currencyCode: String; var source: String; var createdAt: Date; var postings: [PostingRecord] }
 enum ImportConflict: String, CaseIterable, Identifiable { case merge = "合并（保留现有数据）"; case overwrite = "覆盖同 ID 数据"; case replaceAll = "清空后恢复"; var id: String { rawValue } }
 enum DataTransferError: LocalizedError { case invalidBackup; case unbalancedTransaction(String); var errorDescription: String? { switch self { case .invalidBackup: return "文件不是有效的 51 记账备份。"; case .unbalancedTransaction(let payee): return "交易“\(payee)”借贷不平衡，已停止导入。" } } }
-struct AccountingFileDocument: FileDocument { static var readableContentTypes: [UTType] { [.data, .json, .plainText, .commaSeparatedText] }; var data: Data; init(data: Data = Data()) { self.data = data }; init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }; func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) } }
+struct AccountingFileDocument: FileDocument {
+ static var readableContentTypes: [UTType] { [.data, .json, .plainText, .commaSeparatedText] }
+ static var writableContentTypes: [UTType] { [.data, .json, .plainText, .commaSeparatedText] }
+ var data: Data
+ init(data: Data = Data()) { self.data = data }
+ init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }
+ func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) }
+}
 struct DataTransferService {
  static let encoder: JSONEncoder = { let e = JSONEncoder(); e.outputFormatting = [.prettyPrinted, .sortedKeys]; e.dateEncodingStrategy = .iso8601; return e }()
  static let decoder: JSONDecoder = { let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601; return d }()
