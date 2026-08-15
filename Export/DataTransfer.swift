@@ -109,16 +109,13 @@ struct DataTransferService {
         }
 
         for record in backup.transactions {
-            let postings = record.postings.map { Posting(accountName: $0.accountName, amount: $0.amount, memo: $0.memo) }
-            let transaction = BookkeepingTransaction(
-                date: record.date,
-                payee: record.payee,
-                note: record.note,
-                currencyCode: record.currencyCode,
-                source: record.source,
-                postings: postings
-            )
-            guard case .success = TransactionValidator.validate(transaction) else {
+            let isBalanced = record.postings.count >= 2 &&
+                record.postings.allSatisfy {
+                    !$0.accountName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                    $0.amount == $0.amount.roundedToCents
+                } &&
+                record.postings.reduce(Decimal.zero) { $0 + $1.amount }.roundedToCents == 0
+            guard isBalanced else {
                 throw DataTransferError.unbalancedTransaction(record.payee)
             }
         }
