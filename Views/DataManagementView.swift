@@ -47,13 +47,12 @@ struct DataManagementView: View {
         .navigationTitle("数据管理")
         .fileExporter(
             isPresented: $showingExporter,
-            document: $exportDocument,
+            document: exportDocument,
             contentType: .data,
-            defaultFilename: exportName.isEmpty ? nil : exportName,
-            onCompletion: { (result: Result<URL, Error>) in
-                if case .failure(let error) = result { errorMessage = error.localizedDescription }
-            }
-        )
+            defaultFilename: exportName.isEmpty ? nil : exportName
+        ) { result in
+            if case .failure(let error) = result { errorMessage = error.localizedDescription }
+        }
         .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.json, .plainText, .commaSeparatedText], allowsMultipleSelection: false) { result in
             importFile(result)
         }
