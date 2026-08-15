@@ -2,31 +2,23 @@ import Foundation
 import SwiftUI
 import SwiftData
 
-enum TransactionEntryType: String, CaseIterable, Identifiable {
-    case expense = "支出"
-    case income = "收入"
-    case transfer = "转账"
-
-    var id: String { rawValue }
-}
-
 struct AddTransactionView: View {
-    private static let noAccount = UUID()
-
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: \.Account.createdAt) private var accounts: [Account]
-    @Query(sort: \.Category.name) private var storedCategories: [Category]
+    @Query(sort: \Account.createdAt) private var accounts: [Account]
+    @Query(sort: \Category.name) private var storedCategories: [Category]
 
-    @State private var type: TransactionEntryType = .expense
+    @State private var type: TransactionEntryKind = .expense
     @State private var amount = ""
-    @State private var sourceAccountID = AddTransactionView.noAccount
-    @State private var destinationAccountID = AddTransactionView.noAccount
+    @State private var sourceAccountID: UUID?
+    @State private var destinationAccountID: UUID?
+    @State private var selectedCategoryID = ""
     @State private var payee = ""
-    @State private var category = ""
     @State private var note = ""
     @State private var date = Date()
     @State private var errorMessage: String?
+    @FocusState private var isAmountFocused: Bool
+
     @State private var isAccountCreatorPresented = false
     @State private var accountCreationTarget: AccountSelectionTarget = .source
     @State private var newAccountName = ""
@@ -34,98 +26,49 @@ struct AddTransactionView: View {
     @State private var newAccountCurrency = "CNY"
     @State private var accountCreationError: String?
 
-    private let fallbackExpenseCategories = ["餐饮", "交通", "购物", "居住", "娱乐", "其他"]
-    private let fallbackIncomeCategories = ["工资", "奖金", "利息", "投资收益", "其他"]
+    private var categoryOptions: [LedgerCategoryOption] {
+        LedgerCategoryCatalog.options(for: type, storedCategories: storedCategories)
+    }
 
-    private var selectedSource: Account? { accounts.first { $0.id == sourceAccountID } }
-    private var selectedDestination: Account? { accounts.first { $0.id == destinationAccountID } }
+    private var selectedCategory: LedgerCategoryOption? {
+        categoryOptions.first { $0.id == selectedCategoryID }
+    }
 
-    private var availableCategories: [String] {
-        guard type != .transfer else { return [] }
-        let matching = storedCategories.filter { $0.isIncome == (type == .income) }.map(\.name)
-        let fallback = type == .income ? fallbackIncomeCategories : fallbackExpenseCategories
-        return Array(Set(matching + fallback)).sorted()
+    private var sourceAccount: Account? {
+        accounts.first { $0.id == sourceAccountID }
+    }
+
+    private var destinationAccount: Account? {
+        accounts.first { $0.id == destinationAccountID }
     }
 
     private var parsedAmount: Decimal? {
-        Decimal(string: amount.replacingOccurrences(of: ",", with: "."), locale: Locale(identifier: "en_US_POSIX"))?.roundedToCents
-    }
-
-    private var formattedAmount: String {
-        guard let parsedAmount else { return amount }
-        return NSDecimalNumber(decimal: parsedAmount).stringValue
+        try? MoneyInput.validatedDecimal(from: amount)
     }
 
     private var canSave: Bool {
-        guard let value = parsedAmount, value > 0, selectedSource != nil else { return false }
-        return type != .transfer || selectedDestination != nil && selectedDestination?.id != selectedSource?.id
+        guard parsedAmount != nil, sourceAccount != nil else { return false }
+        switch type {
+        case .expense, .income:
+            return selectedCategory != nil
+        case .transfer:
+            return destinationAccount != nil && sourceAccountID != destinationAccountID
+        }
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Picker("类型", selection: $type) {
-                        ForEach(TransactionEntryType.allCases) { entryType in
-                            Text(entryType.rawValue).tag(entryType)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                Section("金额") {
-                    HStack {
-                        Text("¥")
-                        TextField("0.00", text: $amount)
-                            .keyboardType(.decimalPad)
-                            .monospacedDigit()
-                        if parsedAmount != nil {
-                            Text(formattedAmount)
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
-                        }
-                    }
-                }
-
-                Section("账户") {
-                    accountPicker(title: type == .transfer ? "转出账户" : "账户", selection: $sourceAccountID, excluding: nil)
-                    Button { presentAccountCreator(for: .source) } label: {
-                        Label(type == .transfer ? "新增转出账户" : "新增账户", systemImage: "plus.circle")
-                    }
-
-                    if type == .transfer {
-                        accountPicker(title: "转入账户", selection: $destinationAccountID, excluding: sourceAccountID)
-                        Button { presentAccountCreator(for: .destination) } label: {
-                            Label("新增转入账户", systemImage: "plus.circle")
-                        }
-                    }
-
-                    if accounts.isEmpty {
-                        Text("还没有账户。请先新增一个账户再保存交易。")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                if type != .transfer {
-                    Section("分类") {
-                        Picker("分类", selection: $category) {
-                            Text("请选择分类").tag("")
-                            ForEach(availableCategories, id: \.self) { item in
-                                Text(item).tag(item)
-                            }
-                        }
-                    }
-                }
-
-                Section("详情") {
-                    TextField("商户 / 收入来源", text: $payee)
-                    TextField("备注（可选）", text: $note)
-                    DatePicker("日期", selection: $date, displayedComponents: [.date, .hourAndMinute])
-                }
+                transactionTypeSection
+                amountSection
+                accountSection
+                detailSection
 
                 if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(.red) }
+                    Section {
+                        Text(errorMessage)
+                            .foregroundStyle(.red)
+                    }
                 }
 
                 Section {
@@ -135,25 +78,134 @@ struct AddTransactionView: View {
             }
             .navigationTitle("新增记账")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-            }
-            .onChange(of: type) { _, newType in
-                if newType == .transfer { category = "" }
-                else if !availableCategories.contains(category) { category = availableCategories.first ?? "" }
-            }
-            .onChange(of: storedCategories.count) { _, _ in
-                if type != .transfer && !availableCategories.contains(category) { category = availableCategories.first ?? "" }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
             }
         }
-        .sheet(isPresented: $isAccountCreatorPresented) { accountCreator }
+        .sheet(isPresented: $isAccountCreatorPresented) {
+            accountCreator
+        }
+        .onAppear(perform: synchronizeCategorySelection)
+        .onChange(of: type) { _, _ in
+            synchronizeCategorySelection()
+            errorMessage = nil
+        }
+        .onChange(of: storedCategories.count) { _, _ in
+            synchronizeCategorySelection()
+        }
+        .onChange(of: isAmountFocused) { _, isFocused in
+            guard !isFocused, let parsedAmount else { return }
+            amount = MoneyInput.display(parsedAmount)
+        }
     }
 
-    private func accountPicker(title: String, selection: Binding<UUID>, excluding: UUID?) -> some View {
-        Picker(title, selection: selection) {
-            Text("请选择账户").tag(Self.noAccount)
-            ForEach(accounts.filter { $0.id != excluding }, id: \.id) { account in
-                Text("\(account.name) · \(account.type.chineseName)").tag(account.id)
+    private var transactionTypeSection: some View {
+        Section {
+            Picker("类型", selection: $type) {
+                ForEach(TransactionEntryKind.allCases) { entryType in
+                    Text(entryType.rawValue).tag(entryType)
+                }
             }
+            .pickerStyle(.segmented)
+        }
+    }
+
+    private var amountSection: some View {
+        Section("金额") {
+            HStack {
+                Text("¥")
+                TextField("0.00", text: $amount)
+                    .keyboardType(.decimalPad)
+                    .focused($isAmountFocused)
+                    .monospacedDigit()
+            }
+
+            if let parsedAmount {
+                LabeledContent("记账金额") {
+                    Text("¥ \(MoneyInput.display(parsedAmount))")
+                        .monospacedDigit()
+                }
+                .foregroundStyle(.secondary)
+            } else {
+                Text("金额最多保留两位小数，精确到分。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var accountSection: some View {
+        Section("账户") {
+            Picker(type == .transfer ? "转出账户" : "账户", selection: $sourceAccountID) {
+                Text("请选择账户").tag(UUID?.none)
+                ForEach(accounts) { account in
+                    Text(account.selectionLabel).tag(Optional(account.id))
+                }
+            }
+
+            Button {
+                presentAccountCreator(for: .source)
+            } label: {
+                Label(type == .transfer ? "新增转出账户" : "新增账户", systemImage: "plus.circle")
+            }
+
+            if type == .transfer {
+                Picker("转入账户", selection: $destinationAccountID) {
+                    Text("请选择账户").tag(UUID?.none)
+                    ForEach(accounts.filter { $0.id != sourceAccountID }) { account in
+                        Text(account.selectionLabel).tag(Optional(account.id))
+                    }
+                }
+
+                Button {
+                    presentAccountCreator(for: .destination)
+                } label: {
+                    Label("新增转入账户", systemImage: "plus.circle")
+                }
+
+                Text("转账使用转出账户和转入账户的标准账本路径，且两者不得相同。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else if let sourceAccount {
+                LabeledContent("记账账户") {
+                    Text(sourceAccount.ledgerName)
+                        .font(.footnote.monospaced())
+                }
+                .foregroundStyle(.secondary)
+            }
+
+            if accounts.isEmpty {
+                Text("还没有账户。请先新增一个账户再保存交易。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var detailSection: some View {
+        Section("详情") {
+            TextField(type == .income ? "收入来源" : "商户", text: $payee)
+
+            if type != .transfer {
+                Picker("分类", selection: $selectedCategoryID) {
+                    Text("请选择分类").tag("")
+                    ForEach(categoryOptions) { category in
+                        Text(category.name).tag(category.id)
+                    }
+                }
+
+                if let selectedCategory {
+                    LabeledContent("账本分类") {
+                        Text(selectedCategory.ledgerName)
+                            .font(.footnote.monospaced())
+                    }
+                    .foregroundStyle(.secondary)
+                }
+            }
+
+            TextField("备注（可选）", text: $note)
+            DatePicker("日期", selection: $date, displayedComponents: [.date, .hourAndMinute])
         }
     }
 
@@ -170,13 +222,33 @@ struct AddTransactionView: View {
                     TextField("币种代码", text: $newAccountCurrency)
                         .textInputAutocapitalization(.characters)
                 }
-                if let accountCreationError { Section { Text(accountCreationError).foregroundStyle(.red) } }
+
+                if let accountCreationError {
+                    Section {
+                        Text(accountCreationError)
+                            .foregroundStyle(.red)
+                    }
+                }
             }
             .navigationTitle(accountCreationTarget == .source ? "新增账户" : "新增转入账户")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { isAccountCreatorPresented = false } }
-                ToolbarItem(placement: .confirmationAction) { Button("添加", action: createAccount) }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { isAccountCreatorPresented = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("添加", action: createAccount)
+                }
             }
+        }
+    }
+
+    private func synchronizeCategorySelection() {
+        guard type != .transfer else {
+            selectedCategoryID = ""
+            return
+        }
+        if !categoryOptions.contains(where: { $0.id == selectedCategoryID }) {
+            selectedCategoryID = categoryOptions.first?.id ?? ""
         }
     }
 
@@ -191,12 +263,35 @@ struct AddTransactionView: View {
 
     private func createAccount() {
         do {
-            let draft = try AccountEntryCoordinator.makeDraft(name: newAccountName, type: newAccountType, currencyCode: newAccountCurrency, existingAccountNames: accounts.map(\.name))
-            let newAccount = Account(name: draft.name, type: draft.type, currencyCode: draft.currencyCode)
+            let draft = try AccountEntryCoordinator.makeDraft(
+                name: newAccountName,
+                type: newAccountType,
+                currencyCode: newAccountCurrency,
+                existingAccountNames: accounts.map(\.name)
+            )
+            let newAccount = Account(
+                name: draft.name,
+                type: draft.type,
+                currencyCode: draft.currencyCode
+            )
             modelContext.insert(newAccount)
-            try modelContext.save()
-            if accountCreationTarget == .source { sourceAccountID = newAccount.id }
-            else { destinationAccountID = newAccount.id }
+            do {
+                try modelContext.save()
+            } catch {
+                modelContext.delete(newAccount)
+                throw error
+            }
+
+            let selection = AccountEntryCoordinator.selecting(
+                accountID: newAccount.id,
+                for: accountCreationTarget,
+                from: AccountSelectionState(
+                    sourceAccountID: sourceAccountID,
+                    destinationAccountID: destinationAccountID
+                )
+            )
+            sourceAccountID = selection.sourceAccountID
+            destinationAccountID = selection.destinationAccountID
             isAccountCreatorPresented = false
         } catch {
             accountCreationError = error.localizedDescription
@@ -204,24 +299,31 @@ struct AddTransactionView: View {
     }
 
     private func save() {
-        guard let value = parsedAmount else { errorMessage = "请输入有效金额。"; return }
-        guard let source = selectedSource else { errorMessage = "请选择账户。"; return }
-        let title = payee.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? (category.isEmpty ? type.rawValue : category) : payee.trimmingCharacters(in: .whitespacesAndNewlines)
-        let postings: [Posting]
-        switch type {
-        case .expense:
-            guard !category.isEmpty else { errorMessage = "请选择支出分类。"; return }
-            postings = [Posting(accountName: "Expenses:\(category)", amount: value, memo: title), Posting(accountName: source.ledgerName, amount: -value)]
-        case .income:
-            guard !category.isEmpty else { errorMessage = "请选择收入分类。"; return }
-            postings = [Posting(accountName: source.ledgerName, amount: value), Posting(accountName: "Income:\(category)", amount: -value, memo: title)]
-        case .transfer:
-            guard let destination = selectedDestination, destination.id != source.id else { errorMessage = "请选择两个不同的账户。"; return }
-            postings = [Posting(accountName: destination.ledgerName, amount: value), Posting(accountName: source.ledgerName, amount: -value)]
-        }
         do {
-            try TransactionService.create(date: date, payee: title, note: note, currencyCode: source.currencyCode, postings: postings, in: modelContext)
+            let amount = try MoneyInput.validatedDecimal(from: amount)
+            let resolvedPayee = payee.trimmingCharacters(in: .whitespacesAndNewlines)
+            let defaultPayee = type == .transfer ? "账户转账" : (selectedCategory?.name ?? "")
+            let postings = try TransactionEntryDraft(
+                kind: type,
+                amount: amount,
+                sourceAccount: sourceAccount,
+                destinationAccount: destinationAccount,
+                category: selectedCategory,
+                payee: resolvedPayee.isEmpty ? defaultPayee : resolvedPayee
+            ).makePostings()
+
+            try TransactionService.create(
+                date: date,
+                payee: resolvedPayee.isEmpty ? defaultPayee : resolvedPayee,
+                note: note,
+                currencyCode: sourceAccount?.currencyCode ?? "CNY",
+                source: "手动录入",
+                postings: postings,
+                in: modelContext
+            )
             dismiss()
-        } catch { errorMessage = error.localizedDescription }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }

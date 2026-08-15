@@ -15,8 +15,8 @@ struct AccountCreationDraft: Equatable {
 
 /// 账户选择器的纯状态，便于在 SwiftUI 之外测试新增账户后的回填行为。
 struct AccountSelectionState: Equatable {
-    var sourceAccountName: String
-    var destinationAccountName: String
+    var sourceAccountID: UUID?
+    var destinationAccountID: UUID?
 }
 
 enum AccountEntryError: LocalizedError, Equatable {
@@ -61,16 +61,16 @@ struct AccountEntryCoordinator {
     }
 
     static func selecting(
-        accountNamed accountName: String,
+        accountID: UUID,
         for target: AccountSelectionTarget,
         from currentState: AccountSelectionState
     ) -> AccountSelectionState {
         var state = currentState
         switch target {
         case .source:
-            state.sourceAccountName = accountName
+            state.sourceAccountID = accountID
         case .destination:
-            state.destinationAccountName = accountName
+            state.destinationAccountID = accountID
         }
         return state
     }

@@ -55,31 +55,36 @@ final class AccountEntryCoordinatorTests: XCTestCase {
     }
 
     func testSelectingNewSourceAccountOnlyChangesSourceSelection() {
+        let previousSourceID = UUID()
+        let destinationID = UUID()
+        let selectedSourceID = UUID()
         let state = AccountEntryCoordinator.selecting(
-            accountNamed: "现金",
+            accountID: selectedSourceID,
             for: .source,
             from: AccountSelectionState(
-                sourceAccountName: "旧账户",
-                destinationAccountName: "信用卡"
+                sourceAccountID: previousSourceID,
+                destinationAccountID: destinationID
             )
         )
 
-        XCTAssertEqual(state.sourceAccountName, "现金")
-        XCTAssertEqual(state.destinationAccountName, "信用卡")
+        XCTAssertEqual(state.sourceAccountID, selectedSourceID)
+        XCTAssertEqual(state.destinationAccountID, destinationID)
     }
 
     func testSelectingNewDestinationAccountOnlyChangesDestinationSelection() {
+        let sourceID = UUID()
+        let previousDestinationID = UUID()
+        let selectedDestinationID = UUID()
         let state = AccountEntryCoordinator.selecting(
-            accountNamed: "储蓄卡",
+            accountID: selectedDestinationID,
             for: .destination,
             from: AccountSelectionState(
-                sourceAccountName: "现金",
-                destinationAccountName: "旧转入账户"
+                sourceAccountID: sourceID,
+                destinationAccountID: previousDestinationID
             )
         )
 
-        XCTAssertEqual(state.sourceAccountName, "现金")
-        XCTAssertEqual(state.destinationAccountName, "储蓄卡")
+        XCTAssertEqual(state.sourceAccountID, sourceID)
+        XCTAssertEqual(state.destinationAccountID, selectedDestinationID)
     }
 }
-

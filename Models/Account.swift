@@ -30,6 +30,10 @@ final class Account {
         return "\(type.ledgerPrefix):\(trimmed)"
     }
 
+    var selectionLabel: String {
+        "\(name) · \(type.chineseName)"
+    }
+
     init(name: String, type: AccountType, currencyCode: String = "CNY", openingBalance: Decimal = 0, isLiability: Bool? = nil) {
         id = UUID()
         self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
