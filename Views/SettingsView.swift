@@ -17,21 +17,19 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: 16) {
                                 Label("AI 引擎", systemImage: "cpu.fill").font(.headline.weight(.bold)).foregroundStyle(.blue)
                                 Picker("服务商", selection: $aiProvider) {
-                                    ForEach(AIProvider.allCases, id: \\.rawValue) { provider in
+                                    ForEach(AIProvider.allCases, id: \.rawValue) { provider in
                                         Text(provider.rawValue).tag(provider.rawValue)
                                     }
                                 }
                                 .pickerStyle(.menu)
-                                SecureField("API 密钥（请使用钥匙串）", text: .constant(""))
-                                    .textFieldStyle(.roundedBorder)
+                                SecureField("API 密钥（请使用钥匙串）", text: .constant("")).textFieldStyle(.roundedBorder)
                             }
                         }
                         GlassCard(tint: .cyan) {
                             VStack(alignment: .leading, spacing: 14) {
                                 Label("云端备份", systemImage: "icloud.and.arrow.up.fill").font(.headline.weight(.bold)).foregroundStyle(.cyan)
                                 Toggle("启用 WebDAV", isOn: $webDAVEnabled).tint(.cyan)
-                                Label("支持 WebDAV、GitHub 自动提交和 iCloud Drive", systemImage: "checkmark.shield.fill")
-                                    .font(.caption).foregroundStyle(.secondary)
+                                Label("支持 WebDAV、GitHub 自动提交和 iCloud Drive", systemImage: "checkmark.shield.fill").font(.caption).foregroundStyle(.secondary)
                             }
                         }
                         GlassCard(tint: .orange) {

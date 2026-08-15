@@ -3,7 +3,7 @@ import SwiftData
 
 /// 账务概览：摘要、账户概况与最近交易。
 struct DashboardView: View {
-    @Query(sort: \\BookkeepingTransaction.date, order: .reverse) private var transactions: [BookkeepingTransaction]
+    @Query(sort: \BookkeepingTransaction.date, order: .reverse) private var transactions: [BookkeepingTransaction]
     @Query private var accounts: [Account]
 
     init() {}
@@ -39,11 +39,8 @@ struct DashboardView: View {
     private var header: some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 5) {
-                Text("你好，今天")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
-                Text("51 记账")
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                Text("你好，今天").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+                Text("51 记账").font(.system(size: 34, weight: .bold, design: .rounded))
             }
             Spacer()
             Image(systemName: "waveform.path.ecg")
@@ -59,24 +56,12 @@ struct DashboardView: View {
         GlassCard(tint: .cyan) {
             VStack(alignment: .leading, spacing: 18) {
                 HStack {
-                    Label("总资产概览", systemImage: "chart.line.uptrend.xyaxis")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                    Label("总资产概览", systemImage: "chart.line.uptrend.xyaxis").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
                     Spacer()
-                    Text("本月")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.cyan)
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(.cyan.opacity(0.14), in: Capsule())
+                    Text("本月").font(.caption.weight(.semibold)).foregroundStyle(.cyan).padding(.horizontal, 10).padding(.vertical, 6).background(.cyan.opacity(0.14), in: Capsule())
                 }
-                Text("¥\(balanceText)")
-                    .font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.up.right")
-                    Text("保持良好的记账习惯")
-                }
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.green)
+                Text("¥\(balanceText)").font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
+                Label("保持良好的记账习惯", systemImage: "arrow.up.right").font(.caption.weight(.medium)).foregroundStyle(.green)
             }
         }
     }
@@ -86,8 +71,7 @@ struct DashboardView: View {
             VStack(alignment: .leading, spacing: 14) {
                 sectionTitle("账户", icon: "wallet.pass.fill", color: .purple)
                 if accounts.isEmpty {
-                    Text("添加账户后，这里会显示资产概况")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                    Text("添加账户后，这里会显示资产概况").font(.subheadline).foregroundStyle(.secondary)
                 } else {
                     ForEach(accounts.prefix(3)) { account in
                         HStack(spacing: 12) {
@@ -97,8 +81,7 @@ struct DashboardView: View {
                                 Text(account.currencyCode).font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Text(NSDecimalNumber(decimal: account.openingBalance).description)
-                                .font(.subheadline.weight(.semibold).monospacedDigit())
+                            Text(NSDecimalNumber(decimal: account.openingBalance).description).font(.subheadline.weight(.semibold).monospacedDigit())
                         }
                     }
                 }
@@ -111,8 +94,7 @@ struct DashboardView: View {
             VStack(alignment: .leading, spacing: 14) {
                 sectionTitle("最近交易", icon: "clock.arrow.circlepath", color: .orange)
                 if transactions.isEmpty {
-                    ContentUnavailableView("暂无交易", systemImage: "tray", description: Text("使用 AI 快速记账添加第一笔交易"))
-                        .frame(maxWidth: .infinity)
+                    ContentUnavailableView("暂无交易", systemImage: "tray", description: Text("使用 AI 快速记账添加第一笔交易")).frame(maxWidth: .infinity)
                 } else {
                     ForEach(transactions.prefix(5)) { transaction in
                         HStack(spacing: 12) {
@@ -131,9 +113,6 @@ struct DashboardView: View {
     }
 
     private func sectionTitle(_ title: String, icon: String, color: Color) -> some View {
-        Label(title, systemImage: icon)
-            .font(.headline.weight(.bold))
-            .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(color)
+        Label(title, systemImage: icon).font(.headline.weight(.bold)).symbolRenderingMode(.hierarchical).foregroundStyle(color)
     }
 }
