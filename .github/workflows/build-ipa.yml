@@ -38,7 +38,7 @@ jobs:
           set -uo pipefail
           rm -rf Accounting51.xcodeproj xcodegen.log
           set +e
-          xcodegen generate --spec project.yml --verbose > >(tee xcodegen.log) 2>&1
+          xcodegen generate --spec project.yml > >(tee xcodegen.log) 2>&1
           xcodegen_status=${PIPESTATUS[0]}
           set -e
           if [ "$xcodegen_status" -ne 0 ]; then
