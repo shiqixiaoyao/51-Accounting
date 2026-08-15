@@ -1,30 +1,50 @@
 import SwiftUI
 
-/// 中文设置页面，统一显示 AI、备份和导出选项。
+/// 中文设置页面，采用分组玻璃卡片和清晰的系统设置层级。
 struct SettingsView: View {
     @AppStorage("aiProvider") private var aiProvider = AIProvider.openAICompatible.rawValue
     @AppStorage("webDAVEnabled") private var webDAVEnabled = false
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("AI 引擎") {
-                    Picker("服务商", selection: $aiProvider) {
-                        ForEach(AIProvider.allCases, id: \.rawValue) {
-                            Text($0.rawValue).tag($0.rawValue)
+            ZStack {
+                Color.black.ignoresSafeArea()
+                LinearGradient(colors: [.blue.opacity(0.14), .black], startPoint: .topTrailing, endPoint: .bottomLeading).ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        Text("设置").font(.system(size: 34, weight: .bold, design: .rounded))
+                        GlassCard(tint: .blue) {
+                            VStack(alignment: .leading, spacing: 16) {
+                                Label("AI 引擎", systemImage: "cpu.fill").font(.headline.weight(.bold)).foregroundStyle(.blue)
+                                Picker("服务商", selection: $aiProvider) {
+                                    ForEach(AIProvider.allCases, id: \\.rawValue) { provider in
+                                        Text(provider.rawValue).tag(provider.rawValue)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                SecureField("API 密钥（请使用钥匙串）", text: .constant(""))
+                                    .textFieldStyle(.roundedBorder)
+                            }
+                        }
+                        GlassCard(tint: .cyan) {
+                            VStack(alignment: .leading, spacing: 14) {
+                                Label("云端备份", systemImage: "icloud.and.arrow.up.fill").font(.headline.weight(.bold)).foregroundStyle(.cyan)
+                                Toggle("启用 WebDAV", isOn: $webDAVEnabled).tint(.cyan)
+                                Label("支持 WebDAV、GitHub 自动提交和 iCloud Drive", systemImage: "checkmark.shield.fill")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        GlassCard(tint: .orange) {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Label("导出", systemImage: "square.and.arrow.up.fill").font(.headline.weight(.bold)).foregroundStyle(.orange)
+                                Text("支持 Beancount 纯文本复式记账格式").font(.subheadline).foregroundStyle(.secondary)
+                            }
                         }
                     }
-                    SecureField("API 密钥（请使用钥匙串）", text: .constant(""))
-                }
-                Section("云端备份") {
-                    Toggle("启用 WebDAV", isOn: $webDAVEnabled)
-                    Label("支持 WebDAV、GitHub 自动提交和 iCloud Drive", systemImage: "cloud")
-                }
-                Section("导出") {
-                    Text("支持 Beancount 纯文本复式记账格式")
+                    .padding(18)
                 }
             }
-            .navigationTitle("设置")
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 }
