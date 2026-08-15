@@ -26,6 +26,7 @@ targets:
       CURRENT_PROJECT_VERSION: "1"
       MARKETING_VERSION: "1.0"
       SWIFT_VERSION: "5.9"
+      ENABLE_TESTABILITY: YES
       CODE_SIGNING_ALLOWED: NO
       CODE_SIGNING_REQUIRED: NO
       CODE_SIGN_IDENTITY: ""
@@ -37,3 +38,17 @@ targets:
       - path: Tests
     dependencies:
       - target: Accounting51
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.shiqixiaoyao.accounting51.tests
+schemes:
+  Accounting51:
+    build:
+      targets:
+        Accounting51: all
+        Accounting51Tests: [test]
+    test:
+      config: Debug
+      targets:
+        - name: Accounting51Tests
+          parallelizable: false
+          randomExecutionOrder: false

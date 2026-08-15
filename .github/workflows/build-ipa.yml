@@ -22,8 +22,7 @@ jobs:
         run: |
           set -euxo pipefail
           test -f 51App.swift
-          for directory in AI Export Models Services Security Sync Views; do test -d "$directory"; done
-          test -d Tests
+          for directory in AI Export Models Services Security Sync Views Tests; do test -d "$directory"; done
           test -f Info.plist
       - name: Install tools
         run: brew install xcodegen swiftlint
@@ -31,12 +30,21 @@ jobs:
         run: swiftlint lint --config .swiftlint.yml --lenient
       - name: Generate project
         run: xcodegen generate --spec project.yml
-      - name: Validate project
+      - name: Validate project and schemes
         run: xcodebuild -list -project Accounting51.xcodeproj
       - name: Test
-        run: xcodebuild test -project Accounting51.xcodeproj -scheme Accounting51 -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' CODE_SIGNING_ALLOWED=NO
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Accounting51.xcodeproj \
+            -scheme Accounting51 \
+            -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' \
+            -parallel-testing-enabled NO \
+            -maximum-parallel-testing-workers 1 \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee test.log
       - name: Build
-        run: xcodebuild clean build -project Accounting51.xcodeproj -scheme Accounting51 -destination 'generic/platform=iOS' -configuration Release -derivedDataPath build CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' CODE_SIGNING_ALLOWED=NO
+        run: xcodebuild clean build -project Accounting51.xcodeproj -scheme Accounting51 -destination 'generic/platform=iOS' -configuration Release -derivedDataPath build CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
       - name: Package IPA
         run: |
           set -euxo pipefail
