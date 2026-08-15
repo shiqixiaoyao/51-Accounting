@@ -17,6 +17,7 @@ targets:
       - path: AI
       - path: Export
       - path: Models
+      - path: Services
       - path: Sync
       - path: Views
     info:
