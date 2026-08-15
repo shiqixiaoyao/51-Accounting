@@ -23,7 +23,7 @@ final class Account {
         self.typeRawValue = type.rawValue
         self.currencyCode = currencyCode
         self.openingBalance = openingBalance
-        self.isLiability = isLiability ?? type == .liability
+        self.isLiability = isLiability ?? (type == AccountType.liability)
         self.createdAt = .now
     }
 }
