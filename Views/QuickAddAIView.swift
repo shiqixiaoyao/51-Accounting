@@ -25,24 +25,30 @@ struct QuickAddAIView: View {
                 LinearGradient(colors: [.purple.opacity(0.16), .black], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
-                        Text("快速记账").font(.system(size: 34, weight: .bold, design: .rounded))
-                        Text("用一句话记录每一笔生活开销").foregroundStyle(.secondary)
+                        HStack(alignment: .firstTextBaseline) {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text("和绯儿记账").font(.system(size: 34, weight: .bold, design: .rounded))
+                                Text("告诉绯儿发生了什么，她会帮你整理好分录").foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "sparkles").foregroundStyle(.purple).font(.title2)
+                        }
                         GlassCard(tint: .purple) {
                             VStack(alignment: .leading, spacing: 14) {
-                                Label("自然语言记账", systemImage: "wand.and.stars").font(.headline.weight(.bold)).foregroundStyle(.purple)
+                                Label("绯儿", systemImage: "bubble.left.and.bubble.right.fill").font(.headline.weight(.bold)).foregroundStyle(.purple)
                                 TextEditor(text: $text).scrollContentBackground(.hidden).frame(minHeight: 120).padding(10).background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous)).overlay(alignment: .topLeading) { if text.isEmpty { Text("例如：美团外卖 35.5 招行").foregroundStyle(.secondary).padding(18) } }
-                                Button { parse() } label: { Label(manager.isLoading ? "正在解析…" : "AI 解析", systemImage: manager.isLoading ? "hourglass" : "sparkles").frame(maxWidth: .infinity).padding(.vertical, 4) }.buttonStyle(.borderedProminent).tint(.purple).disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || manager.isLoading)
+                                Button { parse() } label: { Label(manager.isLoading ? "绯儿正在整理…" : "让绯儿记下来", systemImage: manager.isLoading ? "hourglass" : "sparkles").frame(maxWidth: .infinity).padding(.vertical, 4) }.buttonStyle(.borderedProminent).tint(.purple).disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || manager.isLoading)
                             }
                         }
                         if let proposal {
                             GlassCard(tint: .green) {
                                 VStack(alignment: .leading, spacing: 12) {
-                                    Label("确认账单", systemImage: "checkmark.seal.fill").font(.headline.weight(.bold)).foregroundStyle(.green)
-                                    Text(proposal.payee).font(.title3.weight(.bold))
+                                    Label("绯儿的记账建议", systemImage: "checkmark.seal.fill").font(.headline.weight(.bold)).foregroundStyle(.green)
+                                    Text("我理解为：\(proposal.payee)").font(.title3.weight(.bold))
                                     ForEach(proposal.postings) { posting in HStack { Text(posting.account); Spacer(); Text("\(NSDecimalNumber(decimal: posting.amount).description) \(proposal.currencyCode)").monospacedDigit() }.font(.subheadline) }
-                                    Text("置信度 \(Int(proposal.confidence * 100))%").font(.caption).foregroundStyle(.secondary)
+                                    Text("置信度 \(Int(proposal.confidence * 100))% · 请确认账户和金额").font(.caption).foregroundStyle(.secondary)
                                     Text(beancountPreview).font(.system(.caption, design: .monospaced)).textSelection(.enabled).padding(12).frame(maxWidth: .infinity, alignment: .leading).background(.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 14))
-                                    Button("保存到交易记录") { save(proposal) }.buttonStyle(.borderedProminent).tint(.green)
+                                    Button("确认并保存") { save(proposal) }.buttonStyle(.borderedProminent).tint(.green)
                                 }
                             }
                         }
@@ -57,12 +63,20 @@ struct QuickAddAIView: View {
     private func parse() {
         errorMessage = nil
         savedMessage = nil
-        Task { do { proposal = try await manager.parse(text: text) } catch { errorMessage = error.localizedDescription } }
+        Task {
+            do { proposal = try await manager.parse(text: text) }
+            catch { errorMessage = error.localizedDescription }
+        }
     }
 
     private func save(_ proposal: TransactionProposal) {
         let postings = proposal.postings.map { Posting(accountName: $0.account, amount: $0.amount, memo: $0.memo ?? "") }
-        modelContext.insert(BookkeepingTransaction(date: proposal.date, payee: proposal.payee, note: proposal.note, currencyCode: proposal.currencyCode, source: "AI 解析", postings: postings))
-        do { try modelContext.save(); savedMessage = "已保存到交易记录"; self.proposal = nil; text = "" } catch { errorMessage = error.localizedDescription }
+        modelContext.insert(BookkeepingTransaction(date: proposal.date, payee: proposal.payee, note: proposal.note, currencyCode: proposal.currencyCode, source: "绯儿（Poke）", postings: postings))
+        do {
+            try modelContext.save()
+            savedMessage = "绯儿：已经保存到交易记录啦。"
+            self.proposal = nil
+            text = ""
+        } catch { errorMessage = error.localizedDescription }
     }
 }
