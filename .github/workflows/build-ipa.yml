@@ -21,32 +21,53 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
       - name: Verify source tree
         run: |
           set -euxo pipefail
           test -f 51App.swift
-          for directory in AI Export Models Services Security Sync Views Tests; do test -d "$directory"; done
+          for directory in AI Export Models Services Security Sync Views Tests; do
+            test -d "$directory"
+          done
           test -f Info.plist
+
       - name: Install tools
         run: brew install xcodegen swiftlint
+
       - name: SwiftLint
         run: swiftlint lint --config .swiftlint.yml --lenient
+
       - name: Generate project
         run: xcodegen generate --spec project.yml
+
       - name: Validate project and schemes
         run: xcodebuild -list -project Accounting51.xcodeproj
+
       - name: Compile test bundle without booting a simulator
         continue-on-error: true
         run: |
           set -o pipefail
-          xcodebuild build-for-testing -project Accounting51.xcodeproj -scheme Accounting51 -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO 2>&1 | tee test-build.log
+          xcodebuild build-for-testing \
+            -project Accounting51.xcodeproj \
+            -scheme Accounting51 \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee test-build.log
+
       - name: Run unit tests on a fixed simulator
         continue-on-error: true
         run: |
           set -o pipefail
-          xcodebuild test -project Accounting51.xcodeproj -scheme Accounting51 -destination 'platform=iOS Simulator,OS=17.5,name=iPhone 15' -parallel-testing-enabled NO -maximum-parallel-testing-workers 1 CODE_SIGNING_ALLOWED=NO 2>&1 | tee test.log
+          xcodebuild test \
+            -project Accounting51.xcodeproj \
+            -scheme Accounting51 \
+            -destination 'platform=iOS Simulator,OS=17.5,name=iPhone 15' \
+            -parallel-testing-enabled NO \
+            -maximum-parallel-testing-workers 1 \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee test.log
+
       - name: Upload test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -56,14 +77,13 @@ jobs:
             test-build.log
             test.log
           if-no-files-found: ignore
+
       - name: Build app for device
         shell: bash
         run: |
           set -uo pipefail
           rm -rf build build.log
           echo '=== Device build command ==='
-          echo "xcodebuild -project Accounting51.xcodeproj -scheme Accounting51 -destination 'generic/platform=iOS' -configuration Release -sdk iphoneos ONLY_ACTIVE_ARCH=NO"
-          set +e
           xcodebuild clean build \
             -project Accounting51.xcodeproj \
             -scheme Accounting51 \
@@ -79,28 +99,21 @@ jobs:
             GCC_TREAT_WARNINGS_AS_ERRORS=NO \
             2>&1 | tee build.log
           build_status=${PIPESTATUS[0]}
-          set -e
           if [ "$build_status" -ne 0 ]; then
-            echo '=== BUILD FAILED: matching compiler/linker errors ==='
-            grep -E -C 3 'error:|fatal error:|BUILD FAILED|The following build commands failed|SwiftEmitModule failed|SwiftCompile failed|Ld ' build.log || true
-            echo '=== BUILD FAILED: last 100 lines ==='
-            tail -n 100 build.log || true
+            echo '=== FULL xcodebuild OUTPUT (build.log) ==='
+            cat build.log
             {
               echo '## Device build failure'
               echo
-              echo '### Matching errors'
+              echo 'The complete xcodebuild output follows:'
               echo '```text'
-              grep -E -C 3 'error:|fatal error:|BUILD FAILED|The following build commands failed|SwiftEmitModule failed|SwiftCompile failed|Ld ' build.log || true
-              echo '```'
-              echo
-              echo '### Last 100 lines'
-              echo '```text'
-              tail -n 100 build.log || true
+              cat build.log
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
             exit "$build_status"
           fi
           echo '=== DEVICE BUILD SUCCEEDED ==='
+
       - name: Upload build diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -108,6 +121,7 @@ jobs:
           name: 51-Accounting-build-diagnostics
           path: build.log
           if-no-files-found: ignore
+
       - name: Package IPA
         run: |
           set -euxo pipefail
@@ -117,6 +131,7 @@ jobs:
           cd build
           zip -qry 51-Accounting.ipa Payload
           test -s 51-Accounting.ipa
+
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
