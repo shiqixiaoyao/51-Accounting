@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build and package IPA
@@ -97,6 +100,18 @@ jobs:
           cd build
           zip -qry 51-Accounting.ipa Payload
           test -s 51-Accounting.ipa
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0-build.${{ github.run_number }}
+          name: 51 Accounting Build ${{ github.run_number }}
+          body: |
+            Automated IPA build from commit ${{ github.sha }}.
+          files: build/51-Accounting.ipa
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
