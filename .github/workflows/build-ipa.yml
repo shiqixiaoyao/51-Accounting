@@ -31,9 +31,13 @@ jobs:
       - name: Generate Xcode project
         shell: bash
         run: |
-          set -euxo pipefail
+          set -uo pipefail
           rm -rf 51-Accounting.xcodeproj
-          xcodegen generate --spec project.yml --project 51-Accounting.xcodeproj --verbose
+          if ! xcodegen generate --spec project.yml --project 51-Accounting.xcodeproj --verbose; then
+            echo '--- project.yml ---'
+            cat project.yml
+            exit 1
+          fi
           test -f 51-Accounting.xcodeproj/project.pbxproj
 
       - name: Validate Xcode project
