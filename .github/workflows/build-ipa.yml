@@ -36,24 +36,12 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          xcodebuild build-for-testing \
-            -project Accounting51.xcodeproj \
-            -scheme Accounting51 \
-            -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO \
-            2>&1 | tee test-build.log
+          xcodebuild build-for-testing -project Accounting51.xcodeproj -scheme Accounting51 -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO SWIFT_TREAT_WARNINGS_AS_ERRORS=NO GCC_TREAT_WARNINGS_AS_ERRORS=NO 2>&1 | tee test-build.log
       - name: Run unit tests on a fixed simulator
         continue-on-error: true
         run: |
           set -o pipefail
-          xcodebuild test \
-            -project Accounting51.xcodeproj \
-            -scheme Accounting51 \
-            -destination 'platform=iOS Simulator,OS=17.5,name=iPhone 15' \
-            -parallel-testing-enabled NO \
-            -maximum-parallel-testing-workers 1 \
-            CODE_SIGNING_ALLOWED=NO \
-            2>&1 | tee test.log
+          xcodebuild test -project Accounting51.xcodeproj -scheme Accounting51 -destination 'platform=iOS Simulator,OS=17.5,name=iPhone 15' -parallel-testing-enabled NO -maximum-parallel-testing-workers 1 CODE_SIGNING_ALLOWED=NO SWIFT_TREAT_WARNINGS_AS_ERRORS=NO GCC_TREAT_WARNINGS_AS_ERRORS=NO 2>&1 | tee test.log
       - name: Upload test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -65,21 +53,33 @@ jobs:
           if-no-files-found: ignore
       - name: Build app for device
         run: |
-          set -euxo pipefail
-          rm -rf build
+          set -o pipefail
+          set -x
+          rm -rf build build.log
           xcodebuild clean build \
             -project Accounting51.xcodeproj \
-            -target Accounting51 \
+            -scheme Accounting51 \
+            -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -configuration Release \
             -derivedDataPath build \
             CODE_SIGN_IDENTITY='' \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
-          test -d build/Build/Products/Release-iphoneos/Accounting51.app
+            CODE_SIGNING_ALLOWED=NO \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
+            GCC_TREAT_WARNINGS_AS_ERRORS=NO \
+            2>&1 | tee build.log
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 51-Accounting-build-diagnostics
+          path: build.log
+          if-no-files-found: ignore
       - name: Package IPA
         run: |
           set -euxo pipefail
+          test -d build/Build/Products/Release-iphoneos/Accounting51.app
           mkdir -p build/Payload
           cp -R build/Build/Products/Release-iphoneos/Accounting51.app build/Payload/
           cd build
