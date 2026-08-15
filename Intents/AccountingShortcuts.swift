@@ -96,31 +96,29 @@ struct AccountingAppShortcuts: AppShortcutsProvider {
     static var shortcutTileColor: ShortcutTileColor = .teal
 
     static var appShortcuts: [AppShortcut] {
-        [
-            AppShortcut(
-                intent: RecordExpenseIntent(),
-                phrases: ["在\(.applicationName)记录支出", "用\(.applicationName)记一笔支出"],
-                shortTitle: "记录支出",
-                systemImageName: "minus.circle"
-            ),
-            AppShortcut(
-                intent: RecordIncomeIntent(),
-                phrases: ["在\(.applicationName)记录收入", "用\(.applicationName)记一笔收入"],
-                shortTitle: "记录收入",
-                systemImageName: "plus.circle"
-            ),
-            AppShortcut(
-                intent: OpenAIAccountingIntent(),
-                phrases: ["在\(.applicationName)打开AI记账"],
-                shortTitle: "AI 记账",
-                systemImageName: "sparkles"
-            ),
-            AppShortcut(
-                intent: BackupToCloudIntent(),
-                phrases: ["在\(.applicationName)备份账务数据"],
-                shortTitle: "云端备份",
-                systemImageName: "icloud.and.arrow.up"
-            )
-        ]
+        AppShortcut(
+            intent: RecordExpenseIntent(),
+            phrases: ["在\(.applicationName)记录支出", "用\(.applicationName)记一笔支出"],
+            shortTitle: "记录支出",
+            systemImageName: "minus.circle"
+        )
+        AppShortcut(
+            intent: RecordIncomeIntent(),
+            phrases: ["在\(.applicationName)记录收入", "用\(.applicationName)记一笔收入"],
+            shortTitle: "记录收入",
+            systemImageName: "plus.circle"
+        )
+        AppShortcut(
+            intent: OpenAIAccountingIntent(),
+            phrases: ["在\(.applicationName)打开AI记账"],
+            shortTitle: "AI 记账",
+            systemImageName: "sparkles"
+        )
+        AppShortcut(
+            intent: BackupToCloudIntent(),
+            phrases: ["在\(.applicationName)备份账务数据"],
+            shortTitle: "云端备份",
+            systemImageName: "icloud.and.arrow.up"
+        )
     }
 }
