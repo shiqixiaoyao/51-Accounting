@@ -3,7 +3,7 @@ import SwiftData
 
 /// 中文账务概览页面。
 struct DashboardView: View {
-    @Query(sort: \\.date, order: .reverse) private var transactions: [BookkeepingTransaction]
+    @Query(sort: \BookkeepingTransaction.date, order: .reverse) private var transactions: [BookkeepingTransaction]
 
     init() {}
 
