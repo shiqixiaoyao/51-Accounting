@@ -28,8 +28,22 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      - name: Inspect source tree
+        shell: bash
+        run: |
+          set -euxo pipefail
+          pwd
+          find . -maxdepth 3 -type f -name '*.swift' -print
+          test -f project.yml
+          sed -n '1,200p' project.yml
+
       - name: Generate Xcode project
-        run: xcodegen generate --spec project.yml --project 51-Accounting.xcodeproj
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -rf 51-Accounting.xcodeproj
+          xcodegen generate --spec project.yml --project 51-Accounting.xcodeproj
+          test -f 51-Accounting.xcodeproj/project.pbxproj
 
       - name: Validate Xcode project
         run: xcodebuild -list -project 51-Accounting.xcodeproj
