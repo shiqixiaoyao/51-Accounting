@@ -4,6 +4,7 @@ struct AIServiceConfiguration: Equatable {
     let provider: AIProvider
     let endpoint: URL
     let apiKey: String
+    let model: String
 }
 
 enum AIConfigurationError: LocalizedError, Equatable {
@@ -11,6 +12,7 @@ enum AIConfigurationError: LocalizedError, Equatable {
     case invalidEndpoint
     case insecureEndpoint
     case missingAPIKey
+    case missingModel
 
     var errorDescription: String? {
         switch self {
@@ -18,6 +20,7 @@ enum AIConfigurationError: LocalizedError, Equatable {
         case .invalidEndpoint: return "AI 服务地址格式无效。"
         case .insecureEndpoint: return "AI 服务地址应使用 HTTPS；本机调试可使用 localhost。"
         case .missingAPIKey: return "请输入并安全保存 API 密钥。"
+        case .missingModel: return "请输入模型名称。"
         }
     }
 }
@@ -26,13 +29,15 @@ enum AIConfigurationStore {
     private static let providerKey = "aiProvider"
     private static let endpointKey = "aiEndpoint"
     private static let apiKeyKey = "aiAPIKey"
+    private static let modelKey = "aiModel"
 
     static func load() throws -> AIServiceConfiguration {
         migrateLegacyCredential()
         return try makeConfiguration(
             provider: AIProvider(rawValue: UserDefaults.standard.string(forKey: providerKey) ?? "") ?? .poke,
             endpointText: UserDefaults.standard.string(forKey: endpointKey) ?? "",
-            apiKey: KeychainStore.read(apiKeyKey) ?? ""
+            apiKey: KeychainStore.read(apiKeyKey) ?? "",
+            model: UserDefaults.standard.string(forKey: modelKey) ?? ""
         )
     }
 
@@ -45,34 +50,24 @@ enum AIConfigurationStore {
         UserDefaults.standard.removeObject(forKey: apiKeyKey)
     }
 
-    static func save(provider: AIProvider, endpointText: String, apiKey: String) throws {
-        let configuration = try makeConfiguration(
-            provider: provider,
-            endpointText: endpointText,
-            apiKey: apiKey
-        )
+    static func save(provider: AIProvider, endpointText: String, apiKey: String, model: String) throws {
+        let configuration = try makeConfiguration(provider: provider, endpointText: endpointText, apiKey: apiKey, model: model)
         UserDefaults.standard.set(configuration.provider.rawValue, forKey: providerKey)
         UserDefaults.standard.set(configuration.endpoint.absoluteString, forKey: endpointKey)
+        UserDefaults.standard.set(configuration.model, forKey: modelKey)
         try KeychainStore.write(configuration.apiKey, for: apiKeyKey)
     }
 
-    static func makeConfiguration(
-        provider: AIProvider,
-        endpointText: String,
-        apiKey: String
-    ) throws -> AIServiceConfiguration {
+    static func makeConfiguration(provider: AIProvider, endpointText: String, apiKey: String, model: String) throws -> AIServiceConfiguration {
         let normalizedEndpoint = endpointText.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedEndpoint.isEmpty else { throw AIConfigurationError.missingEndpoint }
-        guard let endpoint = URL(string: normalizedEndpoint), let scheme = endpoint.scheme?.lowercased(), endpoint.host != nil else {
-            throw AIConfigurationError.invalidEndpoint
-        }
+        guard let endpoint = URL(string: normalizedEndpoint), let scheme = endpoint.scheme?.lowercased(), endpoint.host != nil else { throw AIConfigurationError.invalidEndpoint }
         let isLocalhost = endpoint.host == "localhost" || endpoint.host == "127.0.0.1"
-        guard scheme == "https" || (scheme == "http" && isLocalhost) else {
-            throw AIConfigurationError.insecureEndpoint
-        }
+        guard scheme == "https" || (scheme == "http" && isLocalhost) else { throw AIConfigurationError.insecureEndpoint }
         guard !normalizedKey.isEmpty else { throw AIConfigurationError.missingAPIKey }
-
-        return AIServiceConfiguration(provider: provider, endpoint: endpoint, apiKey: normalizedKey)
+        guard !normalizedModel.isEmpty else { throw AIConfigurationError.missingModel }
+        return AIServiceConfiguration(provider: provider, endpoint: endpoint, apiKey: normalizedKey, model: normalizedModel)
     }
 }
