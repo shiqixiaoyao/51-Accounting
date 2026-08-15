@@ -16,16 +16,42 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
+      - name: Inspect source tree
+        run: |
+          set -euxo pipefail
+          pwd
+          find . -maxdepth 2 -type f | sort
+          test -f 51App.swift
+          test -d AI
+          test -d Export
+          test -d Models
+          test -d Sync
+          test -d Views
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
       - name: Generate Xcode project
+        shell: bash
         run: |
-          rm -rf *.xcodeproj
-          xcodegen generate --spec project.yml --verbose
+          set -uo pipefail
+          rm -rf Accounting51.xcodeproj
+          if ! xcodegen generate --spec project.yml --verbose; then
+            echo '--- project.yml ---'
+            cat project.yml
+            echo '--- source tree ---'
+            find . -maxdepth 2 -print | sort
+            exit 1
+          fi
+          test -f Accounting51.xcodeproj/project.pbxproj
+
+      - name: Validate Xcode project
+        run: xcodebuild -list -project Accounting51.xcodeproj
 
       - name: Build app with xcodebuild
+        shell: bash
         run: |
+          set -euxo pipefail
           xcodebuild clean build \
             -project Accounting51.xcodeproj \
             -scheme Accounting51 \
@@ -37,10 +63,15 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       - name: Package IPA
+        shell: bash
         run: |
+          set -euxo pipefail
+          test -d build/Build/Products/Release-iphoneos/Accounting51.app
           mkdir -p build/Payload
           cp -R build/Build/Products/Release-iphoneos/Accounting51.app build/Payload/
-          cd build && zip -qry 51-Accounting.ipa Payload
+          cd build
+          zip -qry 51-Accounting.ipa Payload
+          test -s 51-Accounting.ipa
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
