@@ -60,7 +60,9 @@ jobs:
       - name: Build app with xcodebuild
         shell: bash
         run: |
-          set -euxo pipefail
+          set -uo pipefail
+          rm -rf build xcodebuild.log
+          set +e
           xcodebuild clean build \
             -project Accounting51.xcodeproj \
             -scheme Accounting51 \
@@ -69,7 +71,21 @@ jobs:
             -derivedDataPath build \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            > >(tee xcodebuild.log) 2>&1
+          xcodebuild_status=${PIPESTATUS[0]}
+          set -e
+          if [ "$xcodebuild_status" -ne 0 ]; then
+            echo '--- xcodebuild errors ---'
+            grep -E 'error:|fatal error:|✗|BUILD FAILED|The following build commands failed' xcodebuild.log || true
+            error_message=$(grep -E 'error:|fatal error:|✗|BUILD FAILED|The following build commands failed' xcodebuild.log | tr '\n' ' ' || true)
+            if [ -z "$error_message" ]; then
+              error_message=$(tail -n 80 xcodebuild.log | tr '\n' ' ')
+            fi
+            echo "::error title=xcodebuild failed::${error_message}"
+            cat xcodebuild.log
+            exit "$xcodebuild_status"
+          fi
 
       - name: Package IPA
         shell: bash
