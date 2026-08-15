@@ -6,10 +6,12 @@ final class AIAndBackupReliabilityTests: XCTestCase {
         let configuration = try AIConfigurationStore.makeConfiguration(
             provider: .openAICompatible,
             endpointText: "  https://api.example.com/v1/bookkeeping  ",
+            model: " accounting-model ",
             apiKey: "  secret-key  "
         )
 
         XCTAssertEqual(configuration.endpoint.absoluteString, "https://api.example.com/v1/bookkeeping")
+        XCTAssertEqual(configuration.model, "accounting-model")
         XCTAssertEqual(configuration.apiKey, "secret-key")
         XCTAssertEqual(configuration.provider, .openAICompatible)
     }
@@ -19,6 +21,7 @@ final class AIAndBackupReliabilityTests: XCTestCase {
             try AIConfigurationStore.makeConfiguration(
                 provider: .deepSeek,
                 endpointText: "http://api.example.com/parse",
+                model: "deepseek-v4-flash",
                 apiKey: "key"
             )
         ) { error in
