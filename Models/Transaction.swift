@@ -24,5 +24,10 @@ final class BookkeepingTransaction {
         self.postings = postings
     }
 
-    var isBalanced: Bool { postings.reduce(Decimal.zero) { $0 + $1.amount } == 0 }
+    var isBalanced: Bool {
+        switch TransactionValidator.validate(postings: postings) {
+        case .success: return true
+        case .failure: return false
+        }
+    }
 }
