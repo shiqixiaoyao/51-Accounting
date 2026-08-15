@@ -9,6 +9,11 @@ on:
 permissions:
   contents: write
 
+env:
+  SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
+  GCC_TREAT_WARNINGS_AS_ERRORS: NO
+  ONLY_ACTIVE_ARCH: NO
+
 jobs:
   build:
     name: Build and package IPA
@@ -36,12 +41,12 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          xcodebuild build-for-testing -project Accounting51.xcodeproj -scheme Accounting51 -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO SWIFT_TREAT_WARNINGS_AS_ERRORS=NO GCC_TREAT_WARNINGS_AS_ERRORS=NO 2>&1 | tee test-build.log
+          xcodebuild build-for-testing -project Accounting51.xcodeproj -scheme Accounting51 -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO 2>&1 | tee test-build.log
       - name: Run unit tests on a fixed simulator
         continue-on-error: true
         run: |
           set -o pipefail
-          xcodebuild test -project Accounting51.xcodeproj -scheme Accounting51 -destination 'platform=iOS Simulator,OS=17.5,name=iPhone 15' -parallel-testing-enabled NO -maximum-parallel-testing-workers 1 CODE_SIGNING_ALLOWED=NO SWIFT_TREAT_WARNINGS_AS_ERRORS=NO GCC_TREAT_WARNINGS_AS_ERRORS=NO 2>&1 | tee test.log
+          xcodebuild test -project Accounting51.xcodeproj -scheme Accounting51 -destination 'platform=iOS Simulator,OS=17.5,name=iPhone 15' -parallel-testing-enabled NO -maximum-parallel-testing-workers 1 CODE_SIGNING_ALLOWED=NO 2>&1 | tee test.log
       - name: Upload test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -52,23 +57,50 @@ jobs:
             test.log
           if-no-files-found: ignore
       - name: Build app for device
+        shell: bash
         run: |
-          set -o pipefail
-          set -x
+          set -uo pipefail
           rm -rf build build.log
+          echo '=== Device build command ==='
+          echo "xcodebuild -project Accounting51.xcodeproj -scheme Accounting51 -destination 'generic/platform=iOS' -configuration Release -sdk iphoneos ONLY_ACTIVE_ARCH=NO"
+          set +e
           xcodebuild clean build \
             -project Accounting51.xcodeproj \
             -scheme Accounting51 \
-            -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -configuration Release \
+            -sdk iphoneos \
             -derivedDataPath build \
             CODE_SIGN_IDENTITY='' \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO \
             SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
             GCC_TREAT_WARNINGS_AS_ERRORS=NO \
             2>&1 | tee build.log
+          build_status=${PIPESTATUS[0]}
+          set -e
+          if [ "$build_status" -ne 0 ]; then
+            echo '=== BUILD FAILED: matching compiler/linker errors ==='
+            grep -E -C 3 'error:|fatal error:|BUILD FAILED|The following build commands failed|SwiftEmitModule failed|SwiftCompile failed|Ld ' build.log || true
+            echo '=== BUILD FAILED: last 100 lines ==='
+            tail -n 100 build.log || true
+            {
+              echo '## Device build failure'
+              echo
+              echo '### Matching errors'
+              echo '```text'
+              grep -E -C 3 'error:|fatal error:|BUILD FAILED|The following build commands failed|SwiftEmitModule failed|SwiftCompile failed|Ld ' build.log || true
+              echo '```'
+              echo
+              echo '### Last 100 lines'
+              echo '```text'
+              tail -n 100 build.log || true
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit "$build_status"
+          fi
+          echo '=== DEVICE BUILD SUCCEEDED ==='
       - name: Upload build diagnostics
         if: always()
         uses: actions/upload-artifact@v4
