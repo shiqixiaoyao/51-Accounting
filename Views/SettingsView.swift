@@ -23,6 +23,9 @@ struct SettingsView: View {
                     NavigationLink("账户管理") {
                         AccountManagementView()
                     }
+                    NavigationLink("分类管理") {
+                        CategoryManagementView()
+                    }
                     NavigationLink("数据管理") {
                         DataManagementView()
                     }

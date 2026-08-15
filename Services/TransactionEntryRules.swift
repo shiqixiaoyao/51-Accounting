@@ -1,7 +1,7 @@
 import Foundation
 
 /// 新增记账页面和领域规则共用的交易类型。
-enum TransactionEntryKind: String, CaseIterable, Identifiable {
+enum TransactionEntryKind: String, CaseIterable, Identifiable, Equatable {
     case expense = "支出"
     case income = "收入"
     case transfer = "转账"
@@ -25,8 +25,21 @@ struct LedgerCategoryOption: Identifiable, Equatable {
 
 /// 动态分类目录：优先使用已保存的分类，并补全用户尚未创建时的默认分类。
 enum LedgerCategoryCatalog {
-    private static let expenseDefaults = ["餐饮", "交通", "购物", "居住", "娱乐", "其他"]
-    private static let incomeDefaults = ["工资", "奖金", "利息", "投资收益", "其他收入"]
+    private static let expenseDefaults = [
+        "餐饮", "交通", "购物", "居住", "娱乐", "医疗健康", "教育学习",
+        "通信网络", "人情往来", "保险", "宠物", "旅行", "其他支出"
+    ]
+    private static let incomeDefaults = [
+        "工资", "奖金", "兼职收入", "报销", "利息", "投资收益", "租金", "礼金", "退款", "其他收入"
+    ]
+
+    static func defaultOptions(for entryKind: TransactionEntryKind) -> [LedgerCategoryOption] {
+        guard entryKind != .transfer else { return [] }
+        let wantsIncome = entryKind == .income
+        return (wantsIncome ? incomeDefaults : expenseDefaults).map {
+            LedgerCategoryOption(name: $0, isIncome: wantsIncome)
+        }
+    }
 
     static func options(
         for entryKind: TransactionEntryKind,
@@ -39,9 +52,7 @@ enum LedgerCategoryCatalog {
             guard category.isIncome == wantsIncome, !name.isEmpty else { return nil }
             return LedgerCategoryOption(name: name, isIncome: category.isIncome)
         }
-        let defaults = (wantsIncome ? incomeDefaults : expenseDefaults).map {
-            LedgerCategoryOption(name: $0, isIncome: wantsIncome)
-        }
+        let defaults = defaultOptions(for: entryKind)
 
         var seen = Set<String>()
         return (stored + defaults).filter { option in

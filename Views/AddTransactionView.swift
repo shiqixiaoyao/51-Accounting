@@ -25,6 +25,7 @@ struct AddTransactionView: View {
     @State private var newAccountType: AccountType = .asset
     @State private var newAccountCurrency = "CNY"
     @State private var accountCreationError: String?
+    @State private var categoryCreationKind: CategoryCreationKind?
 
     private var categoryOptions: [LedgerCategoryOption] {
         LedgerCategoryCatalog.options(for: type, storedCategories: storedCategories)
@@ -85,6 +86,14 @@ struct AddTransactionView: View {
         }
         .sheet(isPresented: $isAccountCreatorPresented) {
             accountCreator
+        }
+        .sheet(item: $categoryCreationKind) { kind in
+            CategoryCreationSheet(kind: kind) { category in
+                selectedCategoryID = LedgerCategoryOption(
+                    name: category.name,
+                    isIncome: category.isIncome
+                ).id
+            }
         }
         .onAppear(perform: synchronizeCategorySelection)
         .onChange(of: type) { _, _ in
@@ -193,6 +202,12 @@ struct AddTransactionView: View {
                     ForEach(categoryOptions) { category in
                         Text(category.name).tag(category.id)
                     }
+                }
+
+                Button {
+                    categoryCreationKind = type == .income ? .income : .expense
+                } label: {
+                    Label(type == .income ? "新增收入分类" : "新增支出分类", systemImage: "plus.circle")
                 }
 
                 if let selectedCategory {
