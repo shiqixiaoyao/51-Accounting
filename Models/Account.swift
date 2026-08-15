@@ -14,13 +14,9 @@ final class Account {
 
     var type: AccountType {
         get { AccountType(rawValue: typeRawValue) ?? .asset }
-        set {
-            typeRawValue = newValue.rawValue
-            isLiability = newValue == .liability
-        }
+        set { typeRawValue = newValue.rawValue; isLiability = newValue == .liability }
     }
 
-    /// 用于 Beancount 导出的标准账户名；用户自定义账户名保持不变。
     var ledgerName: String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "Assets:Cash" }
@@ -35,35 +31,13 @@ final class Account {
     }
 
     init(name: String, type: AccountType, currencyCode: String = "CNY", openingBalance: Decimal = 0, isLiability: Bool? = nil) {
-        self.id = UUID()
-        self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        self.typeRawValue = type.rawValue
-        self.currencyCode = currencyCode
-        self.openingBalance = openingBalance.roundedToCents
-        self.isLiability = isLiability ?? (type == .liability)
-        self.createdAt = .now
+        id = UUID(); self.name = name.trimmingCharacters(in: .whitespacesAndNewlines); typeRawValue = type.rawValue; self.currencyCode = currencyCode; self.openingBalance = openingBalance.roundedToCents; self.isLiability = isLiability ?? (type == .liability); createdAt = .now
     }
 }
 
 enum AccountType: String, Codable, CaseIterable {
     case asset, liability, equity, income, expense
-
     var chineseName: String {
-        switch self {
-        case .asset: return "资产"
-        case .liability: return "负债"
-        case .equity: return "权益"
-        case .income: return "收入"
-        case .expense: return "支出"
-        }
-    }
-}
-
-extension Decimal {
-    var roundedToCents: Decimal {
-        var source = self
-        var result = Decimal()
-        NSDecimalRound(&result, &source, 2, .bankers)
-        return result
+        switch self { case .asset: return "资产"; case .liability: return "负债"; case .equity: return "权益"; case .income: return "收入"; case .expense: return "支出" }
     }
 }
