@@ -37,7 +37,11 @@ jobs:
         run: |
           set -uo pipefail
           rm -rf Accounting51.xcodeproj xcodegen.log
-          if ! xcodegen generate --spec project.yml --verbose 2>&1 | tee xcodegen.log; then
+          set +e
+          xcodegen generate --spec project.yml --verbose > >(tee xcodegen.log) 2>&1
+          xcodegen_status=${PIPESTATUS[0]}
+          set -e
+          if [ "$xcodegen_status" -ne 0 ]; then
             error_message=$(tr '\n' ' ' < xcodegen.log)
             echo "::error title=XcodeGen failed::${error_message}"
             echo '--- XcodeGen log ---'
@@ -46,7 +50,7 @@ jobs:
             cat project.yml
             echo '--- source tree ---'
             find . -maxdepth 2 -print | sort
-            exit 1
+            exit "$xcodegen_status"
           fi
           test -f Accounting51.xcodeproj/project.pbxproj
 
