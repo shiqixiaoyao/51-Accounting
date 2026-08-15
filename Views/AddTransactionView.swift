@@ -17,7 +17,7 @@ struct AddTransactionView: View {
     @State private var date = Date()
     @State private var errorMessage: String?
     @State private var isAccountCreatorPresented = false
-    @State private var accountCreationTarget: AccountCreationTarget = .source
+    @State private var accountCreationTarget: AccountSelectionTarget = .source
     @State private var newAccountName = ""
     @State private var newAccountType: AccountType = .asset
     @State private var newAccountCurrency = "CNY"
@@ -154,7 +154,7 @@ struct AddTransactionView: View {
         }
     }
 
-    private func presentAccountCreator(for target: AccountCreationTarget) {
+    private func presentAccountCreator(for target: AccountSelectionTarget) {
         accountCreationTarget = target
         newAccountName = ""
         newAccountType = .asset
