@@ -69,11 +69,19 @@ struct DataTransferService {
         return decoder
     }()
 
-    static func backup(accounts: [Account], categories: [Category], transactions: [BookkeepingTransaction]) throws -> Data {
+    static func backup(
+        accounts: [Account],
+        categories: [Category],
+        transactions: [BookkeepingTransaction],
+        scope: BackupScope = .complete
+    ) throws -> Data {
+        let selectedAccounts = scope == .transactionsOnly ? [] : accounts
+        let selectedCategories = scope == .transactionsOnly ? [] : categories
+        let selectedTransactions = scope == .setupOnly ? [] : transactions
         let value = AccountingBackup(
-            accounts: accounts.map { AccountRecord(id: $0.id, name: $0.name, typeRawValue: $0.typeRawValue, currencyCode: $0.currencyCode, openingBalance: $0.openingBalance, isLiability: $0.isLiability, createdAt: $0.createdAt) },
-            categories: categories.map { CategoryRecord(id: $0.id, name: $0.name, icon: $0.icon, isIncome: $0.isIncome, colorHex: $0.colorHex) },
-            transactions: transactions.map { transaction in
+            accounts: selectedAccounts.map { AccountRecord(id: $0.id, name: $0.name, typeRawValue: $0.typeRawValue, currencyCode: $0.currencyCode, openingBalance: $0.openingBalance, isLiability: $0.isLiability, createdAt: $0.createdAt) },
+            categories: selectedCategories.map { CategoryRecord(id: $0.id, name: $0.name, icon: $0.icon, isIncome: $0.isIncome, colorHex: $0.colorHex) },
+            transactions: selectedTransactions.map { transaction in
                 TransactionRecord(id: transaction.id, date: transaction.date, payee: transaction.payee, note: transaction.note, currencyCode: transaction.currencyCode, source: transaction.source, createdAt: transaction.createdAt, postings: transaction.postings.map { PostingRecord(id: $0.id, accountName: $0.accountName, amount: $0.amount, memo: $0.memo) })
             }
         )
