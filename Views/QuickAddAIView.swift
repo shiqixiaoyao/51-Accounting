@@ -8,6 +8,19 @@ struct QuickAddAIView: View {
     @State private var proposal: TransactionProposal?
     @State private var errorMessage: String?
     @State private var savedMessage: String?
+    let preferredProvider: AIProvider?
+
+    init(preferredProvider: AIProvider? = nil) {
+        self.preferredProvider = preferredProvider
+    }
+
+    private var activeProvider: AIProvider {
+        preferredProvider ?? AIConfigurationStore.selectedProvider()
+    }
+
+    private var title: String {
+        activeProvider == .poke ? "绯儿智能记账" : "\(activeProvider.rawValue) 智能记账"
+    }
 
     var body: some View {
         NavigationStack {
@@ -15,9 +28,8 @@ struct QuickAddAIView: View {
                 Color.black.ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
-                        Text("AI 智能记账")
-                            .font(.largeTitle.bold())
-                        Text("用自然语言描述收支，AI 会生成需确认的平衡分录。请先在设置中完成 AI 服务连接测试。")
+                        Text(title).font(.largeTitle.bold())
+                        Text("用自然语言描述收支，\(activeProvider.rawValue) 会生成需确认的平衡分录。请先在设置中完成 Endpoint、Model 与 API Key 的连接测试。")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         TextEditor(text: $text)
@@ -26,27 +38,17 @@ struct QuickAddAIView: View {
                             .background(.background, in: RoundedRectangle(cornerRadius: 12))
 
                         Button(action: parse) {
-                            if manager.isLoading {
-                                HStack { ProgressView(); Text("正在解析") }
-                            } else {
-                                Label("生成待确认分录", systemImage: "sparkles")
-                            }
+                            if manager.isLoading { HStack { ProgressView(); Text("正在解析") } }
+                            else { Label("使用 \(activeProvider == .poke ? "绯儿" : activeProvider.rawValue) 生成待确认分录", systemImage: "sparkles") }
                         }
                         .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || manager.isLoading)
 
                         if let proposal {
                             VStack(alignment: .leading, spacing: 10) {
-                                Text("解析结果：\(proposal.payee)")
-                                    .font(.headline)
-                                LabeledContent("置信度") {
-                                    Text("\(Int((proposal.confidence * 100).rounded()))%")
-                                        .monospacedDigit()
-                                }
+                                Text("解析结果：\(proposal.payee)").font(.headline)
+                                LabeledContent("置信度") { Text("\(Int((proposal.confidence * 100).rounded()))%").monospacedDigit() }
                                 ForEach(proposal.postings) { posting in
-                                    LabeledContent(posting.account) {
-                                        Text("\(MoneyInput.display(posting.amount)) \(proposal.currencyCode)")
-                                            .monospacedDigit()
-                                    }
+                                    LabeledContent(posting.account) { Text("\(MoneyInput.display(posting.amount)) \(proposal.currencyCode)").monospacedDigit() }
                                 }
                                 Button("确认并保存") { save(proposal) }
                             }
@@ -62,6 +64,9 @@ struct QuickAddAIView: View {
             }
             .navigationTitle("AI 记账")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                NavigationLink { AIServiceSettingsView() } label: { Image(systemName: "slider.horizontal.3") }
+            }
         }
     }
 
@@ -70,33 +75,18 @@ struct QuickAddAIView: View {
         savedMessage = nil
         proposal = nil
         Task {
-            do {
-                proposal = try await manager.parse(text: text)
-            } catch {
-                errorMessage = error.localizedDescription
-            }
+            do { proposal = try await manager.parse(text: text, provider: preferredProvider) }
+            catch { errorMessage = error.localizedDescription }
         }
     }
 
     private func save(_ proposal: TransactionProposal) {
         do {
-            let postings = proposal.postings.map {
-                Posting(accountName: $0.account, amount: $0.amount.roundedToCents, memo: $0.memo ?? "")
-            }
-            try TransactionService.create(
-                date: proposal.date,
-                payee: proposal.payee,
-                note: proposal.note,
-                currencyCode: proposal.currencyCode,
-                source: "AI 记账",
-                postings: postings,
-                in: modelContext
-            )
+            let postings = proposal.postings.map { Posting(accountName: $0.account, amount: $0.amount.roundedToCents, memo: $0.memo ?? "") }
+            try TransactionService.create(date: proposal.date, payee: proposal.payee, note: proposal.note, currencyCode: proposal.currencyCode, source: "AI 记账 · \(activeProvider.rawValue)", postings: postings, in: modelContext)
             savedMessage = "AI 分录已保存到交易记录。"
             self.proposal = nil
             text = ""
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        } catch { errorMessage = error.localizedDescription }
     }
 }

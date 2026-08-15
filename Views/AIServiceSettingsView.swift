@@ -4,6 +4,7 @@ import SwiftUI
 struct AIServiceSettingsView: View {
     @State private var provider: AIProvider = .poke
     @State private var endpoint = ""
+    @State private var model = ""
     @State private var apiKey = ""
     @State private var message: String?
     @State private var errorMessage: String?
@@ -11,58 +12,56 @@ struct AIServiceSettingsView: View {
 
     var body: some View {
         Form {
-            Section("AI 服务") {
-                Picker("服务商", selection: $provider) {
-                    ForEach(AIProvider.allCases, id: \.self) { provider in
-                        Text(provider.rawValue).tag(provider)
-                    }
+            Section("绯儿 / AI 记账服务") {
+                Picker("服务预设", selection: $provider) {
+                    ForEach(AIProvider.allCases) { Text($0.rawValue).tag($0) }
                 }
-                TextField("HTTPS 服务地址", text: $endpoint)
+                .onChange(of: provider) { _, newProvider in load(provider: newProvider) }
+
+                Text(provider.configurationHint)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                TextField("HTTPS Endpoint", text: $endpoint)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.URL)
-                SecureField("API 密钥", text: $apiKey)
+                TextField("Model 名称", text: $model)
+                    .textInputAutocapitalization(.never)
+                SecureField("API Key（仅保存至 Keychain）", text: $apiKey)
             }
 
             Section("连接与安全") {
-                Text("服务地址要求使用 HTTPS；仅 localhost 调试可使用 HTTP。API 密钥仅保存到设备钥匙串，不会进入普通应用设置。")
+                Text("每个服务预设单独保存 Endpoint、Model 和 API Key。API Key 统一保存在系统 Keychain；普通应用设置只保存服务商和非敏感配置。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                Button("保存配置", action: save)
-                Button {
-                    Task { await testConnection() }
-                } label: {
-                    if isTesting {
-                        HStack { ProgressView(); Text("正在测试连接") }
-                    } else {
-                        Label("测试连接", systemImage: "checkmark.icloud")
-                    }
+                Button("保存当前服务配置", action: save)
+                Button { Task { await testConnection() } } label: {
+                    if isTesting { HStack { ProgressView(); Text("正在测试连接") } }
+                    else { Label("测试 \(provider.rawValue) 连接", systemImage: "checkmark.icloud") }
                 }
                 .disabled(isTesting)
             }
 
-            if let message {
-                Section { Text(message).foregroundStyle(.green) }
-            }
-            if let errorMessage {
-                Section { Text(errorMessage).foregroundStyle(.red) }
-            }
+            if let message { Section { Text(message).foregroundStyle(.green) } }
+            if let errorMessage { Section { Text(errorMessage).foregroundStyle(.red) } }
         }
-        .navigationTitle("AI 记账服务")
-        .onAppear(perform: load)
+        .navigationTitle("绯儿 / AI 记账服务")
+        .onAppear { AIConfigurationStore.migrateLegacyCredential(); load(provider: AIConfigurationStore.selectedProvider()) }
     }
 
-    private func load() {
-        AIConfigurationStore.migrateLegacyCredential()
-        provider = AIProvider(rawValue: UserDefaults.standard.string(forKey: "aiProvider") ?? "") ?? .poke
-        endpoint = UserDefaults.standard.string(forKey: "aiEndpoint") ?? ""
-        apiKey = KeychainStore.read("aiAPIKey") ?? ""
+    private func load(provider: AIProvider) {
+        self.provider = provider
+        endpoint = AIConfigurationStore.endpoint(for: provider)
+        model = AIConfigurationStore.model(for: provider)
+        apiKey = AIConfigurationStore.apiKey(for: provider)
+        message = nil
+        errorMessage = nil
     }
 
     private func save() {
         do {
-            try AIConfigurationStore.save(provider: provider, endpointText: endpoint, apiKey: apiKey)
+            try AIConfigurationStore.save(provider: provider, endpointText: endpoint, model: model, apiKey: apiKey)
             errorMessage = nil
-            message = "AI 服务配置已安全保存。"
+            message = "\(provider.rawValue) 配置已安全保存。"
         } catch {
             message = nil
             errorMessage = error.localizedDescription
@@ -71,12 +70,11 @@ struct AIServiceSettingsView: View {
 
     private func testConnection() async {
         do {
-            try AIConfigurationStore.save(provider: provider, endpointText: endpoint, apiKey: apiKey)
+            try AIConfigurationStore.save(provider: provider, endpointText: endpoint, model: model, apiKey: apiKey)
             isTesting = true
             defer { isTesting = false }
-            let result = try await AIBookkeepingManager().testConnection()
+            message = try await AIBookkeepingManager().testConnection(provider: provider)
             errorMessage = nil
-            message = result
         } catch {
             message = nil
             errorMessage = error.localizedDescription
