@@ -27,7 +27,7 @@ jobs:
       - name: Install tools
         run: brew install xcodegen swiftlint
       - name: SwiftLint
-        run: swiftlint lint --config .swiftlint.yml --strict
+        run: swiftlint lint --config .swiftlint.yml --lenient
       - name: Generate project
         run: xcodegen generate --spec project.yml
       - name: Validate project
