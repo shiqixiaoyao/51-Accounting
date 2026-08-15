@@ -1,55 +1,34 @@
 name: Build 51 Accounting IPA
 
-"on":
+on:
   push:
-    branches:
-      - main
-  workflow_dispatch: {}
-  release:
-    types:
-      - published
-
-permissions:
-  contents: write
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     name: Build and package IPA
     runs-on: macos-14
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
       - name: Install XcodeGen
         run: brew install xcodegen
 
       - name: Generate Xcode project
-        shell: bash
         run: |
-          set -uo pipefail
-          rm -rf 51-Accounting.xcodeproj
-          if ! xcodegen generate --spec project.yml --project 51-Accounting.xcodeproj --verbose; then
-            echo '--- project.yml ---'
-            cat project.yml
-            exit 1
-          fi
-          test -f 51-Accounting.xcodeproj/project.pbxproj
+          rm -rf *.xcodeproj
+          xcodegen generate --spec project.yml --verbose
 
-      - name: Validate Xcode project
-        run: xcodebuild -list -project 51-Accounting.xcodeproj
-
-      - name: Build unsigned app
-        shell: bash
+      - name: Build app with xcodebuild
         run: |
-          set -euxo pipefail
           xcodebuild clean build \
-            -project 51-Accounting.xcodeproj \
-            -scheme 51-Accounting \
+            -project Accounting51.xcodeproj \
+            -scheme Accounting51 \
             -destination 'generic/platform=iOS' \
             -configuration Release \
             -derivedDataPath build \
@@ -58,15 +37,10 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       - name: Package IPA
-        shell: bash
         run: |
-          set -euxo pipefail
-          test -d build/Build/Products/Release-iphoneos/51-Accounting.app
           mkdir -p build/Payload
-          cp -R build/Build/Products/Release-iphoneos/51-Accounting.app build/Payload/
-          cd build
-          zip -qry 51-Accounting.ipa Payload
-          test -s 51-Accounting.ipa
+          cp -R build/Build/Products/Release-iphoneos/Accounting51.app build/Payload/
+          cd build && zip -qry 51-Accounting.ipa Payload
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
@@ -74,9 +48,3 @@ jobs:
           name: 51-Accounting-IPA
           path: build/51-Accounting.ipa
           if-no-files-found: error
-
-      - name: Attach IPA to release
-        if: github.event_name == 'release' && github.event.action == 'published'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/51-Accounting.ipa
