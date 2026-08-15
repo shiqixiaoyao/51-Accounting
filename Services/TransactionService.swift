@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 
 struct TransactionService {
+    @discardableResult
     static func create(date: Date = .now, payee: String, note: String = "", currencyCode: String = "CNY", source: String = "手动", postings: [Posting], in context: ModelContext) throws -> BookkeepingTransaction {
         let transaction = BookkeepingTransaction(date: date, payee: payee, note: note, currencyCode: currencyCode, source: source, postings: postings)
         switch TransactionValidator.validate(transaction) {
