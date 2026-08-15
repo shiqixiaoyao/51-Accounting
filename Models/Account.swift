@@ -24,6 +24,10 @@ final class Account {
     /// leaf names ("Bank") or already-qualified paths ("Assets:Bank").
     /// A qualified path is preserved; a leaf is classified from the account type.
     var ledgerName: String {
+        Self.ledgerName(for: name, type: type)
+    }
+
+    static func ledgerName(for name: String, type: AccountType) -> String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "Assets:Cash" }
         if trimmed.contains(":") { return trimmed }
