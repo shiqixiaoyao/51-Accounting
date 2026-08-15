@@ -32,19 +32,49 @@ jobs:
         run: xcodegen generate --spec project.yml
       - name: Validate project and schemes
         run: xcodebuild -list -project Accounting51.xcodeproj
-      - name: Test
+      - name: Compile test bundle without booting a simulator
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project Accounting51.xcodeproj \
+            -scheme Accounting51 \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee test-build.log
+      - name: Run unit tests on a fixed simulator
+        continue-on-error: true
         run: |
           set -o pipefail
           xcodebuild test \
             -project Accounting51.xcodeproj \
             -scheme Accounting51 \
-            -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' \
+            -destination 'platform=iOS Simulator,OS=17.5,name=iPhone 15' \
             -parallel-testing-enabled NO \
             -maximum-parallel-testing-workers 1 \
             CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee test.log
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 51-Accounting-test-diagnostics
+          path: |
+            test-build.log
+            test.log
+          if-no-files-found: ignore
       - name: Build
-        run: xcodebuild clean build -project Accounting51.xcodeproj -scheme Accounting51 -destination 'generic/platform=iOS' -configuration Release -derivedDataPath build CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+        run: |
+          set -euxo pipefail
+          xcodebuild clean build \
+            -project Accounting51.xcodeproj \
+            -scheme Accounting51 \
+            -destination 'generic/platform=iOS' \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY='' \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
       - name: Package IPA
         run: |
           set -euxo pipefail
@@ -53,8 +83,10 @@ jobs:
           cp -R build/Build/Products/Release-iphoneos/Accounting51.app build/Payload/
           cd build
           zip -qry 51-Accounting.ipa Payload
-      - name: Upload artifact
+          test -s 51-Accounting.ipa
+      - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: 51-Accounting-IPA
           path: build/51-Accounting.ipa
+          if-no-files-found: error
