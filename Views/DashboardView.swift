@@ -1,118 +1,23 @@
 import SwiftUI
 import SwiftData
 
-/// 账务概览：摘要、账户概况与最近交易。
 struct DashboardView: View {
+    @Binding var showingAdd: Bool
     @Query(sort: \BookkeepingTransaction.date, order: .reverse) private var transactions: [BookkeepingTransaction]
     @Query private var accounts: [Account]
-
-    init() {}
-
-    private var balance: Decimal {
-        accounts.reduce(Decimal.zero) { $0 + $1.openingBalance }
-    }
-
-    private var balanceText: String {
-        NSDecimalNumber(decimal: balance).description(withLocale: Locale(identifier: "zh_CN"))
-    }
-
+    init(showingAdd: Binding<Bool> = .constant(false)) { _showingAdd = showingAdd }
+    private var balance: Decimal { accounts.reduce(Decimal.zero) { $0 + $1.openingBalance } }
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.black.ignoresSafeArea()
-                LinearGradient(colors: [.cyan.opacity(0.16), .blue.opacity(0.08), .black], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea()
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        header
-                        summaryCard
-                        accountsCard
-                        transactionsCard
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 14)
-                }
-            }
-            .toolbar(.hidden, for: .navigationBar)
+            ZStack(alignment: .bottomTrailing) {
+                Color.black.ignoresSafeArea(); LinearGradient(colors: [.cyan.opacity(0.16), .blue.opacity(0.08), .black], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea()
+                ScrollView(showsIndicators: false) { VStack(alignment: .leading, spacing: 18) { header; summaryCard; accountsCard; transactionsCard }.padding(18) }
+                Button { showingAdd = true } label: { Image(systemName: "plus").font(.title2.weight(.bold)).foregroundStyle(.black).frame(width: 60, height: 60).background(LinearGradient(colors: [.cyan, .mint], startPoint: .topLeading, endPoint: .bottomTrailing), in: Circle()).shadow(color: .cyan.opacity(0.35), radius: 16, y: 8) }.padding(24)
+            }.toolbar(.hidden, for: .navigationBar)
         }
     }
-
-    private var header: some View {
-        HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("你好，今天").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
-                Text("51 记账").font(.system(size: 34, weight: .bold, design: .rounded))
-            }
-            Spacer()
-            Image(systemName: "waveform.path.ecg")
-                .symbolRenderingMode(.hierarchical)
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.cyan)
-                .padding(12)
-                .background(.ultraThinMaterial, in: Circle())
-        }
-    }
-
-    private var summaryCard: some View {
-        GlassCard(tint: .cyan) {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    Label("总资产概览", systemImage: "chart.line.uptrend.xyaxis").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-                    Spacer()
-                    Text("本月").font(.caption.weight(.semibold)).foregroundStyle(.cyan).padding(.horizontal, 10).padding(.vertical, 6).background(.cyan.opacity(0.14), in: Capsule())
-                }
-                Text("¥\(balanceText)").font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
-                Label("保持良好的记账习惯", systemImage: "arrow.up.right").font(.caption.weight(.medium)).foregroundStyle(.green)
-            }
-        }
-    }
-
-    private var accountsCard: some View {
-        GlassCard(tint: .purple) {
-            VStack(alignment: .leading, spacing: 14) {
-                sectionTitle("账户", icon: "wallet.pass.fill", color: .purple)
-                if accounts.isEmpty {
-                    Text("添加账户后，这里会显示资产概况").font(.subheadline).foregroundStyle(.secondary)
-                } else {
-                    ForEach(accounts.prefix(3)) { account in
-                        HStack(spacing: 12) {
-                            GradientIcon(systemName: account.isLiability ? "creditcard.fill" : "building.columns.fill", colors: account.isLiability ? [.orange, .red] : [.purple, .cyan])
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(account.name).font(.subheadline.weight(.semibold))
-                                Text(account.currencyCode).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Text(NSDecimalNumber(decimal: account.openingBalance).description).font(.subheadline.weight(.semibold).monospacedDigit())
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var transactionsCard: some View {
-        GlassCard(tint: .orange) {
-            VStack(alignment: .leading, spacing: 14) {
-                sectionTitle("最近交易", icon: "clock.arrow.circlepath", color: .orange)
-                if transactions.isEmpty {
-                    ContentUnavailableView("暂无交易", systemImage: "tray", description: Text("使用 AI 快速记账添加第一笔交易")).frame(maxWidth: .infinity)
-                } else {
-                    ForEach(transactions.prefix(5)) { transaction in
-                        HStack(spacing: 12) {
-                            GradientIcon(systemName: "arrow.down.left", colors: [.orange, .pink])
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(transaction.payee).font(.subheadline.weight(.semibold))
-                                Text(transaction.date, style: .date).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Text(transaction.currencyCode).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func sectionTitle(_ title: String, icon: String, color: Color) -> some View {
-        Label(title, systemImage: icon).font(.headline.weight(.bold)).symbolRenderingMode(.hierarchical).foregroundStyle(color)
-    }
+    private var header: some View { HStack(alignment: .bottom) { VStack(alignment: .leading, spacing: 5) { Text("你好，今天").font(.subheadline.weight(.medium)).foregroundStyle(.secondary); Text("51 记账").font(.system(size: 34, weight: .bold, design: .rounded)) }; Spacer(); Image(systemName: "waveform.path.ecg").font(.title2.weight(.semibold)).foregroundStyle(.cyan).padding(12).background(.ultraThinMaterial, in: Circle()) } }
+    private var summaryCard: some View { GlassCard(tint: .cyan) { VStack(alignment: .leading, spacing: 18) { Label("总资产概览", systemImage: "chart.line.uptrend.xyaxis").foregroundStyle(.secondary); Text("¥\(NSDecimalNumber(decimal: balance).description)").font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit()); Label("保持良好的记账习惯", systemImage: "arrow.up.right").font(.caption).foregroundStyle(.green) } } }
+    private var accountsCard: some View { GlassCard(tint: .purple) { VStack(alignment: .leading, spacing: 14) { Label("账户", systemImage: "wallet.pass.fill").font(.headline).foregroundStyle(.purple); if accounts.isEmpty { Text("默认账户可直接用于记账").foregroundStyle(.secondary) } else { ForEach(accounts.prefix(3)) { account in HStack { GradientIcon(systemName: account.isLiability ? "creditcard.fill" : "building.columns.fill", colors: [.purple, .cyan]); Text(account.name); Spacer(); Text(NSDecimalNumber(decimal: account.openingBalance).description).monospacedDigit() } } } } } }
+    private var transactionsCard: some View { GlassCard(tint: .orange) { VStack(alignment: .leading, spacing: 14) { Label("最近交易", systemImage: "clock.arrow.circlepath").font(.headline).foregroundStyle(.orange); if transactions.isEmpty { Text("点击右下角 + 添加第一笔交易").foregroundStyle(.secondary) } else { ForEach(transactions.prefix(5)) { TransactionRow(transaction: $0) } } } } }
 }
