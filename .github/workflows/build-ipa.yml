@@ -1,121 +1,35 @@
 name: Build 51 Accounting IPA
-
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-
-permissions:
-  contents: write
-
+on: { push: { branches: [main] }, workflow_dispatch: }
+permissions: { contents: write }
 jobs:
   build:
-    name: Build and package IPA
     runs-on: macos-14
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_15.4.app
-
-      - name: Inspect source tree
+      - name: Verify source tree
         run: |
           set -euxo pipefail
-          pwd
-          find . -maxdepth 2 -type f | sort
-          test -f 51App.swift
-          test -d AI
-          test -d Export
-          test -d Models
-          test -d Sync
-          test -d Views
-          test -f Info.plist
-
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Generate Xcode project
-        shell: bash
-        run: |
-          set -uo pipefail
-          rm -rf Accounting51.xcodeproj xcodegen.log
-          set +e
-          xcodegen generate --spec project.yml > >(tee xcodegen.log) 2>&1
-          xcodegen_status=${PIPESTATUS[0]}
-          set -e
-          if [ "$xcodegen_status" -ne 0 ]; then
-            error_message=$(tr '\n' ' ' < xcodegen.log)
-            echo "::error title=XcodeGen failed::${error_message}"
-            echo '--- XcodeGen log ---'
-            cat xcodegen.log
-            echo '--- project.yml ---'
-            cat project.yml
-            echo '--- source tree ---'
-            find . -maxdepth 2 -print | sort
-            exit "$xcodegen_status"
-          fi
-          test -f Accounting51.xcodeproj/project.pbxproj
-
-      - name: Validate Xcode project
+          test -f 51App.swift; test -d AI; test -d Export; test -d Models; test -d Services; test -d Security; test -d Sync; test -d Views; test -f Info.plist
+      - name: Install tools
+        run: brew install xcodegen swiftlint
+      - name: SwiftLint
+        run: swiftlint lint --config .swiftlint.yml --strict
+      - name: Generate project
+        run: xcodegen generate --spec project.yml
+      - name: Validate project
         run: xcodebuild -list -project Accounting51.xcodeproj
-
-      - name: Build app with xcodebuild
-        shell: bash
-        run: |
-          set -uo pipefail
-          rm -rf build xcodebuild.log
-          set +e
-          xcodebuild clean build \
-            -project Accounting51.xcodeproj \
-            -scheme Accounting51 \
-            -destination 'generic/platform=iOS' \
-            -configuration Release \
-            -derivedDataPath build \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            > >(tee xcodebuild.log) 2>&1
-          xcodebuild_status=${PIPESTATUS[0]}
-          set -e
-          if [ "$xcodebuild_status" -ne 0 ]; then
-            echo '--- xcodebuild errors ---'
-            grep -E 'error:|fatal error:|✗|BUILD FAILED|The following build commands failed' xcodebuild.log || true
-            error_message=$(grep -E 'error:|fatal error:|✗|BUILD FAILED|The following build commands failed' xcodebuild.log | tr '\n' ' ' || true)
-            if [ -z "$error_message" ]; then
-              error_message=$(tail -n 80 xcodebuild.log | tr '\n' ' ')
-            fi
-            echo "::error title=xcodebuild failed::${error_message}"
-            cat xcodebuild.log
-            exit "$xcodebuild_status"
-          fi
-
+      - name: Test
+        run: xcodebuild test -project Accounting51.xcodeproj -scheme Accounting51 -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' CODE_SIGNING_ALLOWED=NO
+      - name: Build
+        run: xcodebuild clean build -project Accounting51.xcodeproj -scheme Accounting51 -destination 'generic/platform=iOS' -configuration Release -derivedDataPath build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
       - name: Package IPA
-        shell: bash
         run: |
           set -euxo pipefail
-          test -d build/Build/Products/Release-iphoneos/Accounting51.app
-          mkdir -p build/Payload
-          cp -R build/Build/Products/Release-iphoneos/Accounting51.app build/Payload/
-          cd build
-          zip -qry 51-Accounting.ipa Payload
-          test -s 51-Accounting.ipa
-
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v0.1.0-build.${{ github.run_number }}
-          name: 51 Accounting Build ${{ github.run_number }}
-          body: |
-            Automated IPA build from commit ${{ github.sha }}.
-          files: build/51-Accounting.ipa
-          fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload IPA Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: 51-Accounting-IPA
-          path: build/51-Accounting.ipa
-          if-no-files-found: error
+          mkdir -p build/Payload; cp -R build/Build/Products/Release-iphoneos/Accounting51.app build/Payload/; cd build; zip -qry 51-Accounting.ipa Payload
+      - uses: softprops/action-gh-release@v2
+        with: { tag_name: v0.1.0-build.${{ github.run_number }}, name: 51 Accounting Build ${{ github.run_number }}, files: build/51-Accounting.ipa }
+        env: { GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
+      - uses: actions/upload-artifact@v4
+        with: { name: 51-Accounting-IPA, path: build/51-Accounting.ipa }

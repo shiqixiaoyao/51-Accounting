@@ -1,33 +1,38 @@
 import Foundation
+import SwiftData
 
-/// 账本计算服务：实时聚合期初余额与全部分录，不依赖缓存值。
 struct TransactionService {
-    static func balance(for account: Account, transactions: [BookkeepingTransaction]) -> Decimal {
-        let movement = transactions.flatMap(\.postings).filter { posting in
-            posting.accountName == account.name || posting.accountName == account.ledgerName || posting.accountName == account.ledgerName.replacingOccurrences(of: "Assets:", with: "") || posting.accountName == account.ledgerName.replacingOccurrences(of: "Liabilities:", with: "")
-        }.reduce(Decimal.zero) { $0 + $1.amount }
-        let signedMovement: Decimal
-        switch account.type {
-        case .asset, .expense: signedMovement = movement
-        case .liability, .equity, .income: signedMovement = -movement
+    static func create(date: Date = .now, payee: String, note: String = "", currencyCode: String = "CNY", source: String = "手动", postings: [Posting], in context: ModelContext) throws -> BookkeepingTransaction {
+        let transaction = BookkeepingTransaction(date: date, payee: payee, note: note, currencyCode: currencyCode, source: source, postings: postings)
+        switch TransactionValidator.validate(transaction) {
+        case .success:
+            context.insert(transaction)
+            do { try context.save(); return transaction }
+            catch { context.delete(transaction); throw error }
+        case .failure(let error): throw error
         }
-        return (account.openingBalance + signedMovement).roundedToCents
     }
 
-    static func balances(accounts: [Account], transactions: [BookkeepingTransaction]) -> [UUID: Decimal] {
-        Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, balance(for: $0, transactions: transactions)) })
+    static func validateAndInsert(_ transaction: BookkeepingTransaction, in context: ModelContext) throws {
+        switch TransactionValidator.validate(transaction) {
+        case .success:
+            context.insert(transaction)
+            do { try context.save() } catch { context.delete(transaction); throw error }
+        case .failure(let error): throw error
+        }
     }
 
-    static func totalAssets(accounts: [Account], transactions: [BookkeepingTransaction]) -> Decimal {
-        accounts.filter { $0.type == .asset }.reduce(Decimal.zero) { $0 + balance(for: $1, transactions: transactions) }.roundedToCents
+    static func create(date: Date = .now, payee: String, note: String = "", currencyCode: String = "CNY", source: String = "手动", postings: [Posting], context: ModelContext) throws -> BookkeepingTransaction {
+        try create(date: date, payee: payee, note: note, currencyCode: currencyCode, source: source, postings: postings, in: context)
     }
 
-    static func totalLiabilities(accounts: [Account], transactions: [BookkeepingTransaction]) -> Decimal {
-        accounts.filter { $0.type == .liability }.reduce(Decimal.zero) { $0 + balance(for: $1, transactions: transactions) }.roundedToCents
+    static func balance(for account: Account, transactions: [BookkeepingTransaction]) -> Decimal {
+        let names = Set([account.name, account.ledgerName, account.ledgerName.replacingOccurrences(of: "Assets:", with: ""), account.ledgerName.replacingOccurrences(of: "Liabilities:", with: "")])
+        let movement = transactions.flatMap(\.postings).filter { names.contains($0.accountName) }.reduce(Decimal.zero) { $0 + $1.amount }
+        switch account.type { case .asset, .expense: return (account.openingBalance + movement).roundedToCents; case .liability, .equity, .income: return (account.openingBalance - movement).roundedToCents }
     }
-
-    /// 全负债模型下的净资产 = 资产 - 负债。
-    static func netAssets(accounts: [Account], transactions: [BookkeepingTransaction]) -> Decimal {
-        (totalAssets(accounts: accounts, transactions: transactions) - totalLiabilities(accounts: accounts, transactions: transactions)).roundedToCents
-    }
+    static func balances(accounts: [Account], transactions: [BookkeepingTransaction]) -> [UUID: Decimal] { Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, balance(for: $0, transactions: transactions)) }) }
+    static func totalAssets(accounts: [Account], transactions: [BookkeepingTransaction]) -> Decimal { accounts.filter { $0.type == .asset }.reduce(Decimal.zero) { $0 + balance(for: $1, transactions: transactions) }.roundedToCents }
+    static func totalLiabilities(accounts: [Account], transactions: [BookkeepingTransaction]) -> Decimal { accounts.filter { $0.type == .liability }.reduce(Decimal.zero) { $0 + balance(for: $1, transactions: transactions) }.roundedToCents }
+    static func netAssets(accounts: [Account], transactions: [BookkeepingTransaction]) -> Decimal { (totalAssets(accounts: accounts, transactions: transactions) - totalLiabilities(accounts: accounts, transactions: transactions)).roundedToCents }
 }
