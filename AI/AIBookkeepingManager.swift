@@ -58,12 +58,21 @@ final class AIBookkeepingManager: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var lastReply = ""
 
+    private let systemPrompt = """
+    你是一个严格的复式记账助手。根据用户描述生成一笔符合 Beancount 约定的交易分录。
+    只返回一个有效 JSON 对象，不要 Markdown、代码围栏、解释或其他文字。
+    JSON 必须完全匹配以下结构：
+    {"id":"UUID","date":"YYYY-MM-DDT00:00:00Z","payee":"string","note":"string","currencyCode":"CNY","postings":[{"id":"UUID","account":"Assets:... or Liabilities:... or Equity:... or Income:... or Expenses:...","amount":0.00,"memo":"string or null"}],"confidence":0.0}
+    金额使用数字并保留两位小数；借方为正、贷方为负；至少两个 posting，所有 posting 的 amount 之和必须严格等于 0。
+    不确定时仍返回最合理的分录，但降低 confidence；不要省略任何字段或 UUID。
+    """
+
     func parse(text: String, provider: AIProvider? = nil) async throws -> TransactionProposal {
         let input = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !input.isEmpty else { throw AIBookkeepingError.invalidInput }
         let configuration = try AIConfigurationStore.load(provider: provider)
-        let data = try await send(configuration: configuration, input: ["文本": input])
-        let proposal = try decodeProposal(data, provider: configuration.provider)
+        let data = try await send(configuration: configuration, userMessage: input)
+        let proposal = try decodeProposal(data)
         try AIProposalValidator.validate(proposal)
         lastReply = "AI 已整理好分录，请确认后保存。"
         return proposal
@@ -71,7 +80,7 @@ final class AIBookkeepingManager: ObservableObject {
 
     func testConnection(provider: AIProvider? = nil) async throws -> String {
         let configuration = try AIConfigurationStore.load(provider: provider)
-        _ = try await send(configuration: configuration, input: ["文本": "连接测试，请返回 JSON 分录。", "测试": "true"])
+        _ = try await send(configuration: configuration, userMessage: "连接测试。请返回一笔金额为 0 的有效 JSON 分录，仍须包含完整字段、至少两个金额相抵的 posting 和 confidence。")
         let result = "已连接到 \(configuration.provider.rawValue) · \(configuration.model)。"
         lastReply = result
         return result
@@ -83,35 +92,53 @@ final class AIBookkeepingManager: ObservableObject {
         return decoder
     }
 
-    private func decodeProposal(_ data: Data, provider: AIProvider) throws -> TransactionProposal {
-        if let proposal = try? decoder.decode(TransactionProposal.self, from: data) { return proposal }
-        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+    private func decodeProposal(_ data: Data) throws -> TransactionProposal {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let content = (((object["choices"] as? [[String: Any]])?.first?["message"] as? [String: Any])?["content"] as? String),
+              let proposalData = extractJSON(from: content).data(using: .utf8) else {
             throw AIBookkeepingError.invalidResponse
         }
-        if let proposal = object["proposal"], JSONSerialization.isValidJSONObject(proposal) {
-            return try decoder.decode(TransactionProposal.self, from: JSONSerialization.data(withJSONObject: proposal))
+        do {
+            return try decoder.decode(TransactionProposal.self, from: proposalData)
+        } catch {
+            throw AIBookkeepingError.invalidResponse
         }
-        let content: String?
-        switch provider.requestStyle {
-        case .chatCompletions:
-            content = (((object["choices"] as? [[String: Any]])?.first?["message"] as? [String: Any])?["content"] as? String)
-        case .anthropicMessages:
-            content = ((object["content"] as? [[String: Any]])?.first?["text"] as? String)
-        case .genericJSON:
-            content = object["content"] as? String ?? object["result"] as? String
-        }
-        guard let content, let proposalData = content.data(using: .utf8) else { throw AIBookkeepingError.invalidResponse }
-        return try decoder.decode(TransactionProposal.self, from: proposalData)
     }
 
-    private func send(configuration: AIServiceConfiguration, input: [String: String]) async throws -> Data {
+    private func extractJSON(from content: String) -> String {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("```") {
+            return trimmed
+                .replacingOccurrences(of: "```json", with: "")
+                .replacingOccurrences(of: "```", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard let start = trimmed.firstIndex(of: "{"), let end = trimmed.lastIndex(of: "}") else { return trimmed }
+        return String(trimmed[start...end])
+    }
+
+    private func send(configuration: AIServiceConfiguration, userMessage: String) async throws -> Data {
         isLoading = true
         defer { isLoading = false }
-        let payload = try AIRequestPayload(configuration: configuration, input: input)
+        var request = URLRequest(url: configuration.endpoint, timeoutInterval: 35)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(configuration.apiKey)", forHTTPHeaderField: "Authorization")
+        let body: [String: Any] = [
+            "model": configuration.model,
+            "messages": [
+                ["role": "system", "content": systemPrompt],
+                ["role": "user", "content": userMessage]
+            ],
+            "temperature": 0,
+            "response_format": ["type": "json_object"]
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
         var lastError: Error?
         for attempt in 0...1 {
             do {
-                let request = try makeRequest(configuration: configuration, payload: payload)
                 let (data, response) = try await URLSession.shared.data(for: request)
                 guard let http = response as? HTTPURLResponse else { throw AIBookkeepingError.invalidResponse }
                 guard (200..<300).contains(http.statusCode) else { throw AIBookkeepingError.serverStatus(http.statusCode) }
@@ -123,36 +150,6 @@ final class AIBookkeepingManager: ObservableObject {
             }
         }
         throw lastError ?? AIBookkeepingError.invalidResponse
-    }
-
-    private func makeRequest(configuration: AIServiceConfiguration, payload: AIRequestPayload) throws -> URLRequest {
-        var request = URLRequest(url: configuration.endpoint, timeoutInterval: 35)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        let text = payload.input["文本"] ?? payload.input.values.first ?? ""
-        let base: [String: Any] = ["provider": payload.provider, "model": payload.model, "input": payload.input]
-
-        switch configuration.provider.requestStyle {
-        case .genericJSON:
-            request.setValue("Bearer \(configuration.apiKey)", forHTTPHeaderField: "Authorization")
-            request.httpBody = try JSONSerialization.data(withJSONObject: base)
-        case .chatCompletions:
-            request.setValue("Bearer \(configuration.apiKey)", forHTTPHeaderField: "Authorization")
-            var body = base
-            body["messages"] = [["role": "system", "content": "你是严格复式记账助手，只返回符合 TransactionProposal 的 JSON。"], ["role": "user", "content": text]]
-            body["response_format"] = ["type": "json_object"]
-            request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        case .anthropicMessages:
-            request.setValue(configuration.apiKey, forHTTPHeaderField: "x-api-key")
-            request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-            var body = base
-            body["max_tokens"] = 1024
-            body["system"] = "你是严格复式记账助手，只返回符合 TransactionProposal 的 JSON。"
-            body["messages"] = [["role": "user", "content": text]]
-            request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        }
-        return request
     }
 
     private func shouldRetry(_ error: Error) -> Bool {
