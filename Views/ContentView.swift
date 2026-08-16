@@ -6,31 +6,18 @@ struct ContentView: View {
     @State private var selectedTab = 0
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            TabView(selection: $selectedTab) {
-                DashboardView(showingAdd: $showingAdd)
-                    .tabItem { Label("概览", systemImage: "chart.bar.xaxis") }
-                    .tag(0)
-                SettingsView()
-                    .tabItem { Label("设置", systemImage: "slider.horizontal.3") }
-                    .tag(1)
-            }
-            Button { showingAdd = true } label: {
-                Image(systemName: "plus")
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(.black)
-                    .frame(width: 62, height: 62)
-                    .background(LinearGradient(colors: [.cyan, .mint], startPoint: .topLeading, endPoint: .bottomTrailing), in: Circle())
-                    .shadow(color: .cyan.opacity(0.35), radius: 16, y: 8)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("新增记账")
-            .offset(y: -18)
+        TabView(selection: $selectedTab) {
+            DashboardView(showingAdd: $showingAdd)
+                .tabItem { Label("概览", systemImage: "chart.bar.xaxis") }
+                .tag(0)
+            SettingsView()
+                .tabItem { Label("设置", systemImage: "slider.horizontal.3") }
+                .tag(1)
         }
         .tint(.cyan)
         .preferredColorScheme(.dark)
         .fontDesign(.rounded)
-        .sheet(isPresented: $showingAdd) { QuickAddAIView() }
+        .sheet(isPresented: $showingAdd) { AddTransactionView() }
         .onAppear(perform: applyPendingShortcutRoute)
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { applyPendingShortcutRoute() }
