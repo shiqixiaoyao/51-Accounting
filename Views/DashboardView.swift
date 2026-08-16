@@ -2,18 +2,25 @@ import SwiftUI
 import SwiftData
 
 struct DashboardView: View {
-    @Environment(\.modelContext) private var modelContext
     @Binding var showingAdd: Bool
     @Query(sort: \.BookkeepingTransaction.date, order: .reverse) private var transactions: [BookkeepingTransaction]
     @Query private var accounts: [Account]
-    @State private var selectedTransaction: BookkeepingTransaction?
-    @State private var errorMessage: String?
 
-    init(showingAdd: Binding<Bool> = .constant(false)) { _showingAdd = showingAdd }
+    init(showingAdd: Binding<Bool> = .constant(false)) {
+        _showingAdd = showingAdd
+    }
 
-    private var totalAssets: Decimal { BalanceCalculator.totalAssets(accounts: accounts, transactions: transactions) }
-    private var totalLiabilities: Decimal { BalanceCalculator.totalLiabilities(accounts: accounts, transactions: transactions) }
-    private var netAssets: Decimal { BalanceCalculator.netAssets(accounts: accounts, transactions: transactions) }
+    private var totalAssets: Decimal {
+        BalanceCalculator.totalAssets(accounts: accounts, transactions: transactions)
+    }
+
+    private var totalLiabilities: Decimal {
+        BalanceCalculator.totalLiabilities(accounts: accounts, transactions: transactions)
+    }
+
+    private var netAssets: Decimal {
+        BalanceCalculator.netAssets(accounts: accounts, transactions: transactions)
+    }
 
     var body: some View {
         NavigationStack {
@@ -36,27 +43,32 @@ struct DashboardView: View {
                         .foregroundStyle(.black)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 15)
-                        .background(LinearGradient(colors: [.cyan, .mint], startPoint: .topLeading, endPoint: .bottomTrailing), in: Capsule())
+                        .background(
+                            LinearGradient(
+                                colors: [.cyan, .mint],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            in: Capsule()
+                        )
                         .shadow(color: .cyan.opacity(0.26), radius: 14, y: 8)
                 }
                 .buttonStyle(.plain)
                 .padding(22)
             }
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(item: $selectedTransaction) { transaction in
-                TransactionDetailView(transaction: transaction)
-            }
-            .alert("删除失败", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
-                Button("确定") {}
-            } message: { Text(errorMessage ?? "") }
         }
     }
 
     private var header: some View {
         HStack(alignment: .bottom, spacing: 14) {
             VStack(alignment: .leading, spacing: 5) {
-                Text("财务概览").font(.subheadline.weight(.semibold)).foregroundStyle(.cyan)
-                Text("今天也记得记一笔").font(.system(size: 30, weight: .bold, design: .rounded)).fixedSize(horizontal: false, vertical: true)
+                Text("财务概览")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.cyan)
+                Text("今天也记得记一笔")
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             GradientIcon(systemName: "waveform.path.ecg", colors: [.cyan, .mint])
@@ -67,11 +79,20 @@ struct DashboardView: View {
         GlassCard(tint: .cyan) {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Label("净资产", systemImage: "chart.line.uptrend.xyaxis").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                    Label("净资产", systemImage: "chart.line.uptrend.xyaxis")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
                     Spacer()
-                    Text("实时计算").font(.caption2.weight(.semibold)).foregroundStyle(.cyan).padding(.horizontal, 9).padding(.vertical, 5).background(.cyan.opacity(0.14), in: Capsule())
+                    Text("实时计算")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.cyan)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(.cyan.opacity(0.14), in: Capsule())
                 }
-                Text("¥\(MoneyInput.display(netAssets))").font(.system(size: 38, weight: .bold, design: .rounded).monospacedDigit()).minimumScaleFactor(0.72)
+                Text("¥\(MoneyInput.display(netAssets))")
+                    .font(.system(size: 38, weight: .bold, design: .rounded).monospacedDigit())
+                    .minimumScaleFactor(0.72)
                 HStack(spacing: 12) {
                     summaryMetric(title: "资产", amount: totalAssets, tint: .mint)
                     summaryMetric(title: "负债", amount: totalLiabilities, tint: .orange)
@@ -83,7 +104,10 @@ struct DashboardView: View {
     private func summaryMetric(title: String, amount: Decimal, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title).font(.caption).foregroundStyle(.secondary)
-            Text("¥\(MoneyInput.display(amount))").font(.subheadline.weight(.semibold).monospacedDigit()).foregroundStyle(tint).lineLimit(1)
+            Text("¥\(MoneyInput.display(amount))")
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .foregroundStyle(tint)
+                .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
@@ -93,16 +117,24 @@ struct DashboardView: View {
     private var accountsCard: some View {
         GlassCard(tint: .indigo) {
             VStack(alignment: .leading, spacing: 14) {
-                sectionTitle("账户余额", icon: "wallet.pass.fill", tint: .indigo, trailing: accounts.isEmpty ? nil : "\(accounts.count) 个账户")
+                sectionTitle(
+                    "账户余额",
+                    icon: "wallet.pass.fill",
+                    tint: .indigo,
+                    trailing: accounts.isEmpty ? nil : "\(accounts.count) 个账户"
+                )
                 if accounts.isEmpty {
                     emptyLine("还没有账户，记账时可直接添加第一个账户。", icon: "wallet.pass")
                 } else {
                     ForEach(accounts.prefix(3)) { account in
                         HStack(spacing: 10) {
-                            Circle().fill(.indigo.opacity(0.78)).frame(width: 7, height: 7)
+                            Circle()
+                                .fill(.indigo.opacity(0.78))
+                                .frame(width: 7, height: 7)
                             Text(account.selectionLabel).lineLimit(1)
                             Spacer()
-                            Text("¥\(MoneyInput.display(BalanceCalculator.balance(for: account, transactions: transactions)))").font(.subheadline.weight(.semibold).monospacedDigit())
+                            Text("¥\(MoneyInput.display(BalanceCalculator.balance(for: account, transactions: transactions)))")
+                                .font(.subheadline.weight(.semibold).monospacedDigit())
                         }
                     }
                 }
@@ -113,36 +145,41 @@ struct DashboardView: View {
     private var transactionsCard: some View {
         GlassCard(tint: .orange) {
             VStack(alignment: .leading, spacing: 14) {
-                sectionTitle("全部交易记录", icon: "clock.arrow.circlepath", tint: .orange, trailing: transactions.isEmpty ? nil : "\(transactions.count) 笔")
+                sectionTitle(
+                    "全部交易记录",
+                    icon: "clock.arrow.circlepath",
+                    tint: .orange,
+                    trailing: transactions.isEmpty ? nil : "\(transactions.count) 笔"
+                )
                 if transactions.isEmpty {
                     emptyLine("从“记一笔”开始，让账本有第一条记录。", icon: "square.and.pencil")
                 } else {
                     ForEach(transactions) { transaction in
-                        Button { selectedTransaction = transaction } label: { TransactionRow(transaction: transaction) }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                Button(role: .destructive) { delete(transaction) } label: { Label("删除", systemImage: "trash") }
-                            }
+                        TransactionRow(transaction: transaction)
                     }
                 }
             }
         }
     }
 
-    private func delete(_ transaction: BookkeepingTransaction) {
-        modelContext.delete(transaction)
-        do { try modelContext.save() } catch { errorMessage = error.localizedDescription }
-    }
-
     private func sectionTitle(_ title: String, icon: String, tint: Color, trailing: String?) -> some View {
         HStack {
-            Label(title, systemImage: icon).font(.headline).foregroundStyle(tint)
+            Label(title, systemImage: icon)
+                .font(.headline)
+                .foregroundStyle(tint)
             Spacer()
-            if let trailing { Text(trailing).font(.caption).foregroundStyle(.secondary) }
+            if let trailing {
+                Text(trailing)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
     private func emptyLine(_ text: String, icon: String) -> some View {
-        Label(text, systemImage: icon).font(.subheadline).foregroundStyle(.secondary).padding(.vertical, 4)
+        Label(text, systemImage: icon)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .padding(.vertical, 4)
     }
 }
