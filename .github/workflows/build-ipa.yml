@@ -138,3 +138,31 @@ jobs:
           name: 51-Accounting-IPA
           path: build/51-Accounting.ipa
           if-no-files-found: error
+
+      - name: Publish GitHub pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0-build.${{ github.run_number }}
+          name: 51 Accounting Build ${{ github.run_number }} — Pre-release
+          body: |
+            51 Accounting Build ${{ github.run_number }} — Pre-release
+
+            This pre-release was built from commit ${{ github.sha }}.
+
+            The workflow completed SwiftLint, XcodeGen project generation, scheme validation, iOS device Release compilation, IPA packaging, and artifact upload.
+
+            Highlights:
+            - Phase 1 bookkeeping refactor and improved account, category, transaction, and double-entry consistency.
+            - Dynamic account creation from the add-transaction flow with automatic source/destination selection.
+            - Account.ID-based selection and canonical Beancount ledger paths: Assets, Liabilities, Equity, Income, and Expenses.
+            - Dynamic income and expense category filtering, transfer validation, two-decimal monetary precision, and balanced postings.
+            - Fei Er / Poke AI bookkeeping entry point with AIBookkeepingManager integration.
+            - Configurable Poke (Fei Er), OpenAI-compatible, DeepSeek, Claude, and custom AI endpoints, including model and API key settings.
+
+            Installation:
+            This IPA is unsigned and is intended for build archival and technical verification. Apple signing and an appropriate distribution channel are required for installation on a regular iPhone.
+          files: build/51-Accounting.ipa
+          prerelease: true
+          draft: false
+          generate_release_notes: false
+          fail_on_unmatched_files: true
