@@ -10,21 +10,20 @@ struct QuickAddAIView: View {
     @State private var proposal: TransactionProposal?
     @State private var errorMessage: String?
     @State private var savedMessage: String?
+    @State private var showingManualEntry = false
     let preferredProvider: AIProvider?
 
     init(preferredProvider: AIProvider? = nil) { self.preferredProvider = preferredProvider }
 
     private var activeProvider: AIProvider { preferredProvider ?? AIConfigurationStore.selectedProvider() }
-    private var title: String { activeProvider == .poke ? "绯儿智能记账" : "\(activeProvider.rawValue) 智能记账" }
+    private var title: String { "AI 智能记账" }
     private var canParse: Bool { !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !manager.isLoading }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 AppBackdrop(accent: .cyan)
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture { isInputFocused = false }
+                Color.clear.contentShape(Rectangle()).onTapGesture { isInputFocused = false }
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 18) {
                         header
@@ -38,17 +37,16 @@ struct QuickAddAIView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
-            .navigationTitle("AI 记账")
+            .navigationTitle("新增记账")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismissFlow() }
-                }
+                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismissFlow() } }
                 ToolbarItem(placement: .primaryAction) {
                     NavigationLink { AIServiceSettingsView() } label: { Image(systemName: "slider.horizontal.3") }
                 }
             }
         }
+        .sheet(isPresented: $showingManualEntry) { AddTransactionView() }
     }
 
     private var header: some View {
@@ -56,12 +54,11 @@ struct QuickAddAIView: View {
             Text(title).font(.system(size: 30, weight: .bold, design: .rounded))
             HStack(spacing: 8) {
                 Image(systemName: "wand.and.stars").foregroundStyle(.cyan)
-                Text("描述收支，预览平衡分录，再确认写入账本。")
+                Text("一句话生成分录，或切换到手动录入。")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             Text(activeProvider.rawValue)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.cyan)
+                .font(.caption.weight(.semibold)).foregroundStyle(.cyan)
                 .padding(.horizontal, 10).padding(.vertical, 6)
                 .background(.cyan.opacity(0.13), in: Capsule())
         }
@@ -70,7 +67,7 @@ struct QuickAddAIView: View {
     private var inputCard: some View {
         GlassCard(tint: .cyan) {
             VStack(alignment: .leading, spacing: 14) {
-                Label("用一句话描述", systemImage: "text.bubble.fill").font(.headline)
+                Label("AI 记账", systemImage: "text.bubble.fill").font(.headline)
                 TextEditor(text: $text)
                     .focused($isInputFocused)
                     .frame(minHeight: 132)
@@ -80,12 +77,14 @@ struct QuickAddAIView: View {
                     .overlay { RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(.white.opacity(0.10), lineWidth: 1) }
                 Text("例如：午餐 36.50 元，用建行卡支付。").font(.footnote).foregroundStyle(.secondary)
                 examplePrompts
-                PrimaryActionButton(
-                    title: manager.isLoading ? "正在解析" : "生成待确认分录",
-                    systemImage: manager.isLoading ? "hourglass" : "sparkles",
-                    isDisabled: !canParse,
-                    action: parse
-                )
+                PrimaryActionButton(title: manager.isLoading ? "正在解析" : "生成待确认分录", systemImage: manager.isLoading ? "hourglass" : "sparkles", isDisabled: !canParse, action: parse)
+                Button { showingManualEntry = true } label: {
+                    Label("手动填写交易", systemImage: "square.and.pencil")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(.cyan)
             }
         }
     }
@@ -110,8 +109,7 @@ struct QuickAddAIView: View {
                 HStack {
                     Label("待确认分录", systemImage: "checkmark.seal.fill").font(.headline).foregroundStyle(.mint)
                     Spacer()
-                    Text("置信度 \(Int((proposal.confidence * 100).rounded()))%")
-                        .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Text("置信度 \(Int((proposal.confidence * 100).rounded()))%").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 }
                 Text(proposal.payee).font(.title3.weight(.bold))
                 VStack(spacing: 0) {
@@ -127,18 +125,11 @@ struct QuickAddAIView: View {
                         if index < proposal.postings.count - 1 { Divider().overlay(.white.opacity(0.10)) }
                     }
                 }
-                Text("分录已通过金额平衡与两位小数校验。确认后将写入账本。")
-                    .font(.footnote).foregroundStyle(.secondary)
+                Text("分录已通过金额平衡与两位小数校验。确认后将写入账本。").font(.footnote).foregroundStyle(.secondary)
                 HStack(spacing: 10) {
-                    Button("重新输入") { resetForReinput() }
-                        .buttonStyle(.bordered)
-                        .tint(.cyan)
-                    Button("清空") { clearInput() }
-                        .buttonStyle(.bordered)
-                        .tint(.orange)
-                    Button("确认保存") { save(proposal) }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.mint)
+                    Button("重新输入") { resetForReinput() }.buttonStyle(.bordered).tint(.cyan)
+                    Button("清空") { clearInput() }.buttonStyle(.bordered).tint(.orange)
+                    Button("确认保存") { save(proposal) }.buttonStyle(.borderedProminent).tint(.mint)
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
@@ -157,35 +148,21 @@ struct QuickAddAIView: View {
     }
 
     private func resetForReinput() {
-        proposal = nil
-        errorMessage = nil
-        savedMessage = nil
-        Task {
-            try? await Task.sleep(nanoseconds: 150_000_000)
-            isInputFocused = true
-        }
+        proposal = nil; errorMessage = nil; savedMessage = nil
+        Task { try? await Task.sleep(nanoseconds: 150_000_000); isInputFocused = true }
     }
 
     private func clearInput() {
-        isInputFocused = false
-        text = ""
-        proposal = nil
-        errorMessage = nil
-        savedMessage = nil
+        isInputFocused = false; text = ""; proposal = nil; errorMessage = nil; savedMessage = nil
     }
 
-    private func dismissFlow() {
-        isInputFocused = false
-        dismiss()
-    }
+    private func dismissFlow() { isInputFocused = false; dismiss() }
 
     private func save(_ proposal: TransactionProposal) {
         do {
             let postings = proposal.postings.map { Posting(accountName: $0.account, amount: $0.amount.roundedToCents, memo: $0.memo ?? "") }
             try TransactionService.create(date: proposal.date, payee: proposal.payee, note: proposal.note, currencyCode: proposal.currencyCode, source: "AI 记账 · \(activeProvider.rawValue)", postings: postings, in: modelContext)
-            savedMessage = "AI 分录已保存到交易记录。"
-            self.proposal = nil
-            text = ""
+            savedMessage = "AI 分录已保存到交易记录。"; self.proposal = nil; text = ""
         } catch { errorMessage = error.localizedDescription }
     }
 }
