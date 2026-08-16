@@ -19,7 +19,7 @@ struct AddAccountView: View {
             Form {
                 Section("账户类型") {
                     Picker("类型", selection: $type) {
-                        ForEach(AccountKind.allCases) { kind in
+                        ForEach(AccountKind.allCases) { (kind: AccountKind) in
                             Label(kind.title, systemImage: kind.icon).tag(kind)
                         }
                     }
@@ -31,7 +31,7 @@ struct AddAccountView: View {
                             .keyboardType(.numberPad)
                             .monospacedDigit()
                             .onChange(of: lastFourDigits) { _, value in
-                                lastFourDigits = String(value.filter(\.isNumber).prefix(4))
+                                lastFourDigits = String(value.filter { (character: Character) in character.isNumber }.prefix(4))
                             }
                     }
                     TextField("币种代码", text: $currencyCode)
@@ -41,13 +41,9 @@ struct AddAccountView: View {
                         .monospacedDigit()
                 }
                 Section("账本预览") {
-                    Text(previewLedgerName)
-                        .font(.footnote.monospaced())
-                        .foregroundStyle(.secondary)
+                    Text(previewLedgerName).font(.footnote.monospaced()).foregroundStyle(.secondary)
                 }
-                if let errorMessage {
-                    Text(errorMessage).foregroundStyle(.red)
-                }
+                if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
             }
             .scrollContentBackground(.hidden)
             .background(Color.black)
@@ -74,10 +70,10 @@ struct AddAccountView: View {
             return
         }
         let normalizedName = type.displayName(institution: institution, lastFourDigits: lastFourDigits)
-        guard !accounts.contains(where: { $0.displayName.caseInsensitiveCompare(normalizedName) == .orderedSame }) else {
-            errorMessage = "该账户已存在。"
-            return
+        let duplicate = accounts.contains { (account: Account) in
+            account.displayName.caseInsensitiveCompare(normalizedName) == .orderedSame
         }
+        guard !duplicate else { errorMessage = "该账户已存在。"; return }
         modelContext.insert(Account(name: institution, type: type.accountType, currencyCode: currencyCode, openingBalance: amount, lastFourDigits: lastFourDigits))
         dismiss()
     }
@@ -85,50 +81,18 @@ struct AddAccountView: View {
 
 enum AccountKind: String, CaseIterable, Identifiable {
     case bankCard, creditCard, wechat, alipay, huabei, jdBaitiao, cash
-
     var id: String { rawValue }
     var title: String {
-        switch self {
-        case .bankCard: return "银行卡"
-        case .creditCard: return "信用卡"
-        case .wechat: return "微信支付"
-        case .alipay: return "支付宝"
-        case .huabei: return "花呗"
-        case .jdBaitiao: return "京东白条"
-        case .cash: return "现金"
-        }
+        switch self { case .bankCard: return "银行卡"; case .creditCard: return "信用卡"; case .wechat: return "微信支付"; case .alipay: return "支付宝"; case .huabei: return "花呗"; case .jdBaitiao: return "京东白条"; case .cash: return "现金" }
     }
     var icon: String {
-        switch self {
-        case .bankCard: return "building.columns"
-        case .creditCard: return "creditcard"
-        case .wechat: return "message"
-        case .alipay: return "a.square"
-        case .huabei, .jdBaitiao: return "calendar.badge.clock"
-        case .cash: return "banknote"
-        }
+        switch self { case .bankCard: return "building.columns"; case .creditCard: return "creditcard"; case .wechat: return "message"; case .alipay: return "a.square"; case .huabei, .jdBaitiao: return "calendar.badge.clock"; case .cash: return "banknote" }
     }
-    var accountType: AccountType {
-        switch self {
-        case .creditCard, .huabei, .jdBaitiao: return .liability
-        default: return .asset
-        }
-    }
+    var accountType: AccountType { (self == .creditCard || self == .huabei || self == .jdBaitiao) ? .liability : .asset }
     var requiresLastFourDigits: Bool { self == .bankCard || self == .creditCard }
     var namePlaceholder: String { requiresLastFourDigits ? "银行或发卡机构" : "账户名称" }
-    func displayName(institution: String, lastFourDigits: String) -> String {
-        let base = institution.trimmingCharacters(in: .whitespacesAndNewlines)
-        return requiresLastFourDigits && !lastFourDigits.isEmpty ? "\(base) (\(lastFourDigits))" : base
-    }
+    func displayName(institution: String, lastFourDigits: String) -> String { let base = institution.trimmingCharacters(in: .whitespacesAndNewlines); return requiresLastFourDigits && !lastFourDigits.isEmpty ? "\(base) (\(lastFourDigits))" : base }
     func ledgerName(institution: String, lastFourDigits: String) -> String {
-        switch self {
-        case .bankCard: return "Bank:\(displayName(institution: institution, lastFourDigits: lastFourDigits))"
-        case .creditCard: return "CreditCard:\(displayName(institution: institution, lastFourDigits: lastFourDigits))"
-        case .wechat: return "Wallet:WeChat"
-        case .alipay: return "Wallet:Alipay"
-        case .huabei: return "PayLater:Huabei"
-        case .jdBaitiao: return "PayLater:JDBaitiao"
-        case .cash: return "Cash"
-        }
+        switch self { case .bankCard: return "Bank:\(displayName(institution: institution, lastFourDigits: lastFourDigits))"; case .creditCard: return "CreditCard:\(displayName(institution: institution, lastFourDigits: lastFourDigits))"; case .wechat: return "Wallet:WeChat"; case .alipay: return "Wallet:Alipay"; case .huabei: return "PayLater:Huabei"; case .jdBaitiao: return "PayLater:JDBaitiao"; case .cash: return "Cash" }
     }
 }
