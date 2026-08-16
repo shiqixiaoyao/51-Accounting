@@ -48,7 +48,7 @@ final class Account {
         self.currencyCode = currencyCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         self.openingBalance = openingBalance.roundedToCents
         self.isLiability = isLiability ?? (type == .liability)
-        self.lastFourDigits = String(lastFourDigits.filter(\.isNumber).prefix(4))
+        self.lastFourDigits = String(lastFourDigits.filter { character in character.isNumber }.prefix(4))
         createdAt = .now
     }
 }
