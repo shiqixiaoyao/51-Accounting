@@ -10,6 +10,7 @@ final class Account {
     var currencyCode: String
     var openingBalance: Decimal
     var isLiability: Bool
+    var lastFourDigits: String
     var createdAt: Date
 
     var type: AccountType {
@@ -20,11 +21,13 @@ final class Account {
         }
     }
 
-    /// The canonical Beancount account path. User-entered names may be either
-    /// leaf names ("Bank") or already-qualified paths ("Assets:Bank").
-    /// A qualified path is preserved; a leaf is classified from the account type.
+    var displayName: String {
+        let suffix = lastFourDigits.trimmingCharacters(in: .whitespacesAndNewlines)
+        return suffix.isEmpty ? name : "\(name) (\(suffix))"
+    }
+
     var ledgerName: String {
-        Self.ledgerName(for: name, type: type)
+        Self.ledgerName(for: displayName, type: type)
     }
 
     static func ledgerName(for name: String, type: AccountType) -> String {
@@ -35,16 +38,17 @@ final class Account {
     }
 
     var selectionLabel: String {
-        "\(name) · \(type.chineseName)"
+        "\(displayName) · \(type.chineseName)"
     }
 
-    init(name: String, type: AccountType, currencyCode: String = "CNY", openingBalance: Decimal = 0, isLiability: Bool? = nil) {
+    init(name: String, type: AccountType, currencyCode: String = "CNY", openingBalance: Decimal = 0, isLiability: Bool? = nil, lastFourDigits: String = "") {
         id = UUID()
         self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         typeRawValue = type.rawValue
         self.currencyCode = currencyCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         self.openingBalance = openingBalance.roundedToCents
         self.isLiability = isLiability ?? (type == .liability)
+        self.lastFourDigits = String(lastFourDigits.filter(\.isNumber).prefix(4))
         createdAt = .now
     }
 }
