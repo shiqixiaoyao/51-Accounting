@@ -22,6 +22,9 @@ struct QuickAddAIView: View {
         NavigationStack {
             ZStack {
                 AppBackdrop(accent: .cyan)
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { isInputFocused = false }
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 18) {
                         header
@@ -33,16 +36,13 @@ struct QuickAddAIView: View {
                     .padding(18)
                     .padding(.bottom, 24)
                 }
-                .contentShape(Rectangle())
-                .onTapGesture { isInputFocused = false }
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle("AI 记账")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button { dismissFlow() } label: {
-                        Label("取消", systemImage: "xmark")
-                    }
+                    Button("取消") { dismissFlow() }
                 }
                 ToolbarItem(placement: .primaryAction) {
                     NavigationLink { AIServiceSettingsView() } label: { Image(systemName: "slider.horizontal.3") }
@@ -70,8 +70,7 @@ struct QuickAddAIView: View {
     private var inputCard: some View {
         GlassCard(tint: .cyan) {
             VStack(alignment: .leading, spacing: 14) {
-                Label("用一句话描述", systemImage: "text.bubble.fill")
-                    .font(.headline)
+                Label("用一句话描述", systemImage: "text.bubble.fill").font(.headline)
                 TextEditor(text: $text)
                     .focused($isInputFocused)
                     .frame(minHeight: 132)
@@ -79,8 +78,7 @@ struct QuickAddAIView: View {
                     .scrollContentBackground(.hidden)
                     .background(.black.opacity(0.20), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .overlay { RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(.white.opacity(0.10), lineWidth: 1) }
-                Text("例如：午餐 36.50 元，用建行卡支付。")
-                    .font(.footnote).foregroundStyle(.secondary)
+                Text("例如：午餐 36.50 元，用建行卡支付。").font(.footnote).foregroundStyle(.secondary)
                 examplePrompts
                 PrimaryActionButton(
                     title: manager.isLoading ? "正在解析" : "生成待确认分录",
@@ -97,8 +95,7 @@ struct QuickAddAIView: View {
             HStack(spacing: 8) {
                 ForEach(["午餐 36.50 元，用建行卡支付", "收到工资 12,000 元，存入工资卡", "从建行转 500 元到支付宝"], id: \.self) { example in
                     Button(example) { text = example }
-                        .font(.caption)
-                        .foregroundStyle(.cyan)
+                        .font(.caption).foregroundStyle(.cyan)
                         .padding(.horizontal, 10).padding(.vertical, 8)
                         .background(.cyan.opacity(0.10), in: Capsule())
                         .buttonStyle(.plain)
@@ -132,28 +129,46 @@ struct QuickAddAIView: View {
                 }
                 Text("分录已通过金额平衡与两位小数校验。确认后将写入账本。")
                     .font(.footnote).foregroundStyle(.secondary)
-                PrimaryActionButton(title: "确认并保存", systemImage: "checkmark.circle.fill") { save(proposal) }
-                Button { resetForEditing() } label: {
-                    Label("返回修改文字", systemImage: "arrow.uturn.backward")
-                        .frame(maxWidth: .infinity)
+                HStack(spacing: 10) {
+                    Button("重新输入") { resetForReinput() }
+                        .buttonStyle(.bordered)
+                        .tint(.cyan)
+                    Button("清空") { clearInput() }
+                        .buttonStyle(.bordered)
+                        .tint(.orange)
+                    Button("确认保存") { save(proposal) }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.mint)
                 }
-                .buttonStyle(.bordered)
-                .tint(.cyan)
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
     }
 
     private func parse() {
         isInputFocused = false
-        errorMessage = nil; savedMessage = nil; proposal = nil
+        errorMessage = nil
+        savedMessage = nil
+        proposal = nil
         Task {
             do { proposal = try await manager.parse(text: text, provider: preferredProvider) }
             catch { errorMessage = error.localizedDescription }
         }
     }
 
-    private func resetForEditing() {
-        isInputFocused = true
+    private func resetForReinput() {
+        proposal = nil
+        errorMessage = nil
+        savedMessage = nil
+        Task {
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            isInputFocused = true
+        }
+    }
+
+    private func clearInput() {
+        isInputFocused = false
+        text = ""
         proposal = nil
         errorMessage = nil
         savedMessage = nil
