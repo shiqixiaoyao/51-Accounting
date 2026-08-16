@@ -3,7 +3,7 @@ import SwiftData
 
 struct DashboardView: View {
     @Binding var showingAdd: Bool
-    @Query(sort: \.BookkeepingTransaction.date, order: .reverse) private var transactions: [BookkeepingTransaction]
+    @Query(sort: \BookkeepingTransaction.date, order: .reverse) private var transactions: [BookkeepingTransaction]
     @Query private var accounts: [Account]
 
     init(showingAdd: Binding<Bool> = .constant(false)) {
