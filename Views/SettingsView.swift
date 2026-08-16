@@ -17,11 +17,20 @@ struct SettingsView: View {
                 }
                 .listRowBackground(Color.clear)
 
-                Section("智能记账") {
-                    NavigationLink { AIServiceSettingsView() } label: { settingLabel("绯儿 / AI 记账服务", icon: "sparkles", tint: .cyan) }
-                    NavigationLink { QuickAddAIView(preferredProvider: .poke) } label: { settingLabel("打开绯儿智能记账", icon: "wand.and.stars", tint: .mint) }
+                Section(header: Text("智能记账")) {
+                    NavigationLink {
+                        AIServiceSettingsView()
+                    } label: {
+                        settingLabel("AI 记账服务", icon: "sparkles", tint: .cyan)
+                    }
+                    NavigationLink {
+                        QuickAddAIView()
+                    } label: {
+                        settingLabel("打开 AI 智能记账", icon: "wand.and.stars", tint: .mint)
+                    }
                 }
-                Section("账户与数据") {
+
+                Section(header: Text("账户与数据")) {
                     NavigationLink("账户管理") { AccountManagementView() }
                     NavigationLink("分类管理") { CategoryManagementView() }
                     NavigationLink("云端备份") { CloudBackupView() }
@@ -33,6 +42,11 @@ struct SettingsView: View {
     }
 
     private func settingLabel(_ title: String, icon: String, tint: Color) -> some View {
-        Label { Text(title) } icon: { Image(systemName: icon).foregroundStyle(tint) }
+        Label {
+            Text(title)
+        } icon: {
+            Image(systemName: icon)
+                .foregroundStyle(tint)
+        }
     }
 }
