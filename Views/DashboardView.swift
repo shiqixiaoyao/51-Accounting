@@ -2,13 +2,9 @@ import SwiftUI
 import SwiftData
 
 struct DashboardView: View {
-    @Binding var showingAdd: Bool
+    @State private var showingAIAdd = false
     @Query(sort: \BookkeepingTransaction.date, order: .reverse) private var transactions: [BookkeepingTransaction]
     @Query private var accounts: [Account]
-
-    init(showingAdd: Binding<Bool> = .constant(false)) {
-        _showingAdd = showingAdd
-    }
 
     private var totalAssets: Decimal {
         BalanceCalculator.totalAssets(accounts: accounts, transactions: transactions)
@@ -42,14 +38,16 @@ struct DashboardView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingAdd = true } label: {
-                        Image(systemName: "plus")
+                    Button { showingAIAdd = true } label: {
+                        Image(systemName: "sparkles")
                             .font(.headline.weight(.bold))
+                            .foregroundStyle(.cyan)
                     }
-                    .accessibilityLabel("添加交易")
+                    .accessibilityLabel("AI 记账")
                 }
             }
         }
+        .sheet(isPresented: $showingAIAdd) { QuickAddAIView() }
     }
 
     private var header: some View {
