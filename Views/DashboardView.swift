@@ -56,7 +56,17 @@ struct DashboardView: View {
                 .buttonStyle(.plain)
                 .padding(22)
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle("财务概览")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showingAdd = true } label: {
+                        Image(systemName: "plus")
+                            .font(.headline.weight(.bold))
+                    }
+                    .accessibilityLabel("添加交易")
+                }
+            }
         }
     }
 
