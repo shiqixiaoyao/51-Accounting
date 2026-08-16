@@ -95,16 +95,16 @@ enum AIConfigurationStore {
         try KeychainStore.write(configuration.apiKey, for: apiKeyKey(for: provider))
     }
     static func makeConfiguration(provider: AIProvider, endpointText: String, model: String, apiKey: String) throws -> AIServiceConfiguration {
-        let endpointText = endpointText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let model = model.trimmingCharacters(in: .whitespacesAndNewlines)
-        let apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !endpointText.isEmpty else { throw AIConfigurationError.missingEndpoint }
-        guard let endpoint = URL(string: endpointText), let scheme = endpoint.scheme?.lowercased(), endpoint.host != nil else { throw AIConfigurationError.invalidEndpoint }
+        let normalizedEndpointText = endpointText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedAPIKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedEndpointText.isEmpty else { throw AIConfigurationError.missingEndpoint }
+        guard let endpoint = URL(string: normalizedEndpointText), let scheme = endpoint.scheme?.lowercased(), endpoint.host != nil else { throw AIConfigurationError.invalidEndpoint }
         let localhost = endpoint.host == "localhost" || endpoint.host == "127.0.0.1"
         guard scheme == "https" || (scheme == "http" && localhost) else { throw AIConfigurationError.insecureEndpoint }
-        guard !model.isEmpty else { throw AIConfigurationError.missingModel }
-        guard !apiKey.isEmpty else { throw AIConfigurationError.missingAPIKey }
-        return AIServiceConfiguration(provider: provider, endpoint: endpoint, model: model, apiKey: apiKey)
+        guard !normalizedModel.isEmpty else { throw AIConfigurationError.missingModel }
+        guard !normalizedAPIKey.isEmpty else { throw AIConfigurationError.missingAPIKey }
+        return AIServiceConfiguration(provider: provider, endpoint: endpoint, model: normalizedModel, apiKey: normalizedAPIKey)
     }
     static func apiKeyKey(for provider: AIProvider) -> String { "aiAPIKey.\(provider.identifier)" }
     private static func endpointKey(for provider: AIProvider) -> String { "aiEndpoint.\(provider.identifier)" }
