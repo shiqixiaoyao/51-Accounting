@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct DashboardView: View {
+    @State private var showingSettings = false
     @State private var showingAIAdd = false
     @Query(sort: \BookkeepingTransaction.date, order: .reverse) private var transactions: [BookkeepingTransaction]
     @Query private var accounts: [Account]
@@ -37,6 +38,13 @@ struct DashboardView: View {
             .navigationTitle("财务概览")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { showingSettings = true } label: {
+                        Image(systemName: "gearshape")
+                            .font(.headline.weight(.bold))
+                    }
+                    .accessibilityLabel("设置")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showingAIAdd = true } label: {
                         Image(systemName: "sparkles")
@@ -47,6 +55,7 @@ struct DashboardView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingSettings) { SettingsView() }
         .sheet(isPresented: $showingAIAdd) { QuickAddAIView() }
     }
 
