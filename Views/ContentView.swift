@@ -13,12 +13,9 @@ struct ContentView: View {
             QuickAddAIView()
                 .tabItem { Label("AI 记账", systemImage: "sparkles") }
                 .tag(1)
-            TransactionHistoryView()
-                .tabItem { Label("记录", systemImage: "list.bullet.rectangle") }
-                .tag(2)
             SettingsView()
                 .tabItem { Label("设置", systemImage: "slider.horizontal.3") }
-                .tag(3)
+                .tag(2)
         }
         .tint(.cyan)
         .preferredColorScheme(.dark)
