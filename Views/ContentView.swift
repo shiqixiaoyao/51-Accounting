@@ -11,8 +11,8 @@ struct ContentView: View {
                 DashboardView()
                     .tabItem { Label("概览", systemImage: "chart.bar.xaxis") }
                     .tag(0)
-                SettingsView()
-                    .tabItem { Label("设置", systemImage: "slider.horizontal.3") }
+                AccountManagementView()
+                    .tabItem { Label("账户管理", systemImage: "wallet.pass") }
                     .tag(1)
             }
 
