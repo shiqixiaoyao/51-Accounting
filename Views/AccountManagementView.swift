@@ -4,13 +4,15 @@ import SwiftData
 @MainActor
 struct AccountManagementView: View {
     @State private var showingAddAccount = false
-    @Query(sort: \Account.createdAt) private var accounts: [Account]
+    @Query(sort: \\Account.createdAt) private var accounts: [Account]
 
     var body: some View {
         NavigationStack {
             List {
                 if accounts.isEmpty {
-                    ContentUnavailableView("暂无账户", systemImage: "building.columns", description: Text("点击右上角添加银行卡、信用卡、支付账户或现金。"))
+                    emptyState
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 } else {
                     Section("账户") {
                         ForEach(accounts) { account in
@@ -22,7 +24,8 @@ struct AccountManagementView: View {
                                     HStack {
                                         Text(account.ledgerName)
                                         Spacer()
-                                        Text("¥ \(MoneyInput.display(account.openingBalance))").monospacedDigit()
+                                        Text("¥ \\(MoneyInput.display(account.openingBalance))")
+                                            .monospacedDigit()
                                     }
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
@@ -47,14 +50,47 @@ struct AccountManagementView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showingAddAccount) { AddAccountView() }
     }
+
+    private var emptyState: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "building.columns")
+                .font(.system(size: 42, weight: .medium))
+                .foregroundStyle(.cyan)
+            VStack(spacing: 6) {
+                Text("暂无账户")
+                    .font(.title3.weight(.semibold))
+                Text("添加银行卡、信用卡、支付账户或现金，开始管理你的账户。")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            Button { showingAddAccount = true } label: {
+                Label("添加第一个账户", systemImage: "plus")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 15)
+                    .foregroundStyle(.black)
+                    .background(
+                        LinearGradient(colors: [.cyan, .mint], startPoint: .leading, endPoint: .trailing),
+                        in: Capsule()
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("添加第一个账户")
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 80)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
 }
 
 @MainActor
 private struct AccountEditorView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
-    @Query(sort: \Account.createdAt) private var accounts: [Account]
-    @Query(sort: \BookkeepingTransaction.date) private var transactions: [BookkeepingTransaction]
+    @Environment(\\.modelContext) private var modelContext
+    @Environment(\\.dismiss) private var dismiss
+    @Query(sort: \\Account.createdAt) private var accounts: [Account]
+    @Query(sort: \\BookkeepingTransaction.date) private var transactions: [BookkeepingTransaction]
 
     let account: Account
     @State private var name: String
@@ -75,27 +111,41 @@ private struct AccountEditorView: View {
     }
 
     private var proposedLedgerName: String { Account.ledgerName(for: displayName, type: type) }
-    private var displayName: String { lastFourDigits.isEmpty ? name : "\(name) (\(lastFourDigits))" }
-    private var affectedPostingCount: Int { transactions.flatMap(\.postings).filter { $0.accountName == account.ledgerName }.count }
+    private var displayName: String { lastFourDigits.isEmpty ? name : "\\(name) (\\(lastFourDigits))" }
+    private var affectedPostingCount: Int {
+        transactions.flatMap(\\.postings).filter { $0.accountName == account.ledgerName }.count
+    }
 
     var body: some View {
         Form {
             Section("账户信息") {
                 TextField("银行或账户名称", text: $name)
                 Picker("账户类型", selection: $type) {
-                    ForEach(AccountType.allCases, id: \.self) { Text($0.chineseName).tag($0) }
+                    ForEach(AccountType.allCases, id: \\.self) { Text($0.chineseName).tag($0) }
                 }
                 if type == .asset || type == .liability {
-                    TextField("卡号后四位（可选）", text: $lastFourDigits).keyboardType(.numberPad).monospacedDigit()
-                        .onChange(of: lastFourDigits) { _, value in lastFourDigits = String(value.filter(\.isNumber).prefix(4)) }
+                    TextField("卡号后四位（可选）", text: $lastFourDigits)
+                        .keyboardType(.numberPad)
+                        .monospacedDigit()
+                        .onChange(of: lastFourDigits) { _, value in
+                            lastFourDigits = String(value.filter(\\.isNumber).prefix(4))
+                        }
                 }
-                TextField("币种代码", text: $currencyCode).textInputAutocapitalization(.characters)
-                TextField("期初余额", text: $openingBalanceInput).keyboardType(.decimalPad).focused($isOpeningBalanceFocused).monospacedDigit()
+                TextField("币种代码", text: $currencyCode)
+                    .textInputAutocapitalization(.characters)
+                TextField("期初余额", text: $openingBalanceInput)
+                    .keyboardType(.decimalPad)
+                    .focused($isOpeningBalanceFocused)
+                    .monospacedDigit()
             }
             Section("账本路径") {
                 LabeledContent("当前路径") { Text(account.ledgerName).font(.footnote.monospaced()) }
                 LabeledContent("保存后路径") { Text(proposedLedgerName).font(.footnote.monospaced()) }
-                if proposedLedgerName != account.ledgerName { Text("保存后将同步更新 \(affectedPostingCount) 条历史分录的账本路径。").font(.footnote).foregroundStyle(.secondary) }
+                if proposedLedgerName != account.ledgerName {
+                    Text("保存后将同步更新 \\(affectedPostingCount) 条历史分录的账本路径。")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
             if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
         }
@@ -104,17 +154,38 @@ private struct AccountEditorView: View {
         .navigationTitle("编辑账户")
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("保存", action: save) } }
         .onChange(of: isOpeningBalanceFocused) { _, focused in
-            guard !focused, let value = try? AccountEditingRules.makeDraft(name: name, type: type, currencyCode: currencyCode, openingBalanceInput: openingBalanceInput, existingAccountNames: accounts.filter { $0.id != account.id }.map(\.name)).openingBalance else { return }
+            guard !focused,
+                  let value = try? AccountEditingRules.makeDraft(
+                    name: name,
+                    type: type,
+                    currencyCode: currencyCode,
+                    openingBalanceInput: openingBalanceInput,
+                    existingAccountNames: accounts.filter { $0.id != account.id }.map(\\.name)
+                  ).openingBalance else { return }
             openingBalanceInput = MoneyInput.display(value)
         }
     }
 
     private func save() {
         do {
-            let draft = try AccountEditingRules.makeDraft(name: displayName, type: type, currencyCode: currencyCode, openingBalanceInput: openingBalanceInput, existingAccountNames: accounts.filter { $0.id != account.id }.map(\.name))
-            try AccountEditingService.update(account: account, allAccounts: accounts, postings: transactions.flatMap(\.postings), draft: draft, in: modelContext)
-            account.lastFourDigits = String(lastFourDigits.filter(\.isNumber).prefix(4))
+            let draft = try AccountEditingRules.makeDraft(
+                name: displayName,
+                type: type,
+                currencyCode: currencyCode,
+                openingBalanceInput: openingBalanceInput,
+                existingAccountNames: accounts.filter { $0.id != account.id }.map(\\.name)
+            )
+            try AccountEditingService.update(
+                account: account,
+                allAccounts: accounts,
+                postings: transactions.flatMap(\\.postings),
+                draft: draft,
+                in: modelContext
+            )
+            account.lastFourDigits = String(lastFourDigits.filter(\\.isNumber).prefix(4))
             dismiss()
-        } catch { errorMessage = error.localizedDescription }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
