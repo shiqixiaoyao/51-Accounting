@@ -24,7 +24,7 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .bottomTrailing) {
+            ZStack {
                 AppBackdrop(accent: .cyan)
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 20) {
@@ -35,26 +35,8 @@ struct DashboardView: View {
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 14)
-                    .padding(.bottom, 102)
+                    .padding(.bottom, 24)
                 }
-                Button { showingAdd = true } label: {
-                    Label("记一笔", systemImage: "plus")
-                        .font(.headline)
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 15)
-                        .background(
-                            LinearGradient(
-                                colors: [.cyan, .mint],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            in: Capsule()
-                        )
-                        .shadow(color: .cyan.opacity(0.26), radius: 14, y: 8)
-                }
-                .buttonStyle(.plain)
-                .padding(22)
             }
             .navigationTitle("财务概览")
             .navigationBarTitleDisplayMode(.large)
