@@ -2,22 +2,43 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @State private var showingAdd = false
+    @State private var showingManualAdd = false
     @State private var selectedTab = 0
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            DashboardView(showingAdd: $showingAdd)
-                .tabItem { Label("概览", systemImage: "chart.bar.xaxis") }
-                .tag(0)
-            SettingsView()
-                .tabItem { Label("设置", systemImage: "slider.horizontal.3") }
-                .tag(1)
+        ZStack(alignment: .bottom) {
+            TabView(selection: $selectedTab) {
+                DashboardView()
+                    .tabItem { Label("概览", systemImage: "chart.bar.xaxis") }
+                    .tag(0)
+                SettingsView()
+                    .tabItem { Label("设置", systemImage: "slider.horizontal.3") }
+                    .tag(1)
+            }
+
+            Button { showingManualAdd = true } label: {
+                Image(systemName: "plus")
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(.black)
+                    .frame(width: 62, height: 62)
+                    .background(
+                        LinearGradient(
+                            colors: [.cyan, .mint],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: Circle()
+                    )
+                    .shadow(color: .cyan.opacity(0.35), radius: 16, y: 8)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("普通记账")
+            .offset(y: -18)
         }
         .tint(.cyan)
         .preferredColorScheme(.dark)
         .fontDesign(.rounded)
-        .sheet(isPresented: $showingAdd) { AddTransactionView() }
+        .sheet(isPresented: $showingManualAdd) { AddTransactionView() }
         .onAppear(perform: applyPendingShortcutRoute)
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { applyPendingShortcutRoute() }
@@ -27,7 +48,7 @@ struct ContentView: View {
     private func applyPendingShortcutRoute() {
         guard let route = ShortcutRouteStore.consume() else { return }
         switch route {
-        case .addTransaction, .aiAccounting: showingAdd = true
+        case .addTransaction, .aiAccounting: showingManualAdd = true
         }
     }
 }
