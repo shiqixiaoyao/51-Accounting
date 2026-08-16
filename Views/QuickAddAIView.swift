@@ -3,6 +3,8 @@ import SwiftData
 
 struct QuickAddAIView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var isInputFocused: Bool
     @StateObject private var manager = AIBookkeepingManager()
     @State private var text = ""
     @State private var proposal: TransactionProposal?
@@ -31,11 +33,20 @@ struct QuickAddAIView: View {
                     .padding(18)
                     .padding(.bottom, 24)
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { isInputFocused = false }
             }
             .navigationTitle("AI 记账")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                NavigationLink { AIServiceSettingsView() } label: { Image(systemName: "slider.horizontal.3") }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button { dismissFlow() } label: {
+                        Label("取消", systemImage: "xmark")
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    NavigationLink { AIServiceSettingsView() } label: { Image(systemName: "slider.horizontal.3") }
+                }
             }
         }
     }
@@ -62,6 +73,7 @@ struct QuickAddAIView: View {
                 Label("用一句话描述", systemImage: "text.bubble.fill")
                     .font(.headline)
                 TextEditor(text: $text)
+                    .focused($isInputFocused)
                     .frame(minHeight: 132)
                     .padding(10)
                     .scrollContentBackground(.hidden)
@@ -121,16 +133,35 @@ struct QuickAddAIView: View {
                 Text("分录已通过金额平衡与两位小数校验。确认后将写入账本。")
                     .font(.footnote).foregroundStyle(.secondary)
                 PrimaryActionButton(title: "确认并保存", systemImage: "checkmark.circle.fill") { save(proposal) }
+                Button { resetForEditing() } label: {
+                    Label("返回修改文字", systemImage: "arrow.uturn.backward")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(.cyan)
             }
         }
     }
 
     private func parse() {
+        isInputFocused = false
         errorMessage = nil; savedMessage = nil; proposal = nil
         Task {
             do { proposal = try await manager.parse(text: text, provider: preferredProvider) }
             catch { errorMessage = error.localizedDescription }
         }
+    }
+
+    private func resetForEditing() {
+        isInputFocused = true
+        proposal = nil
+        errorMessage = nil
+        savedMessage = nil
+    }
+
+    private func dismissFlow() {
+        isInputFocused = false
+        dismiss()
     }
 
     private func save(_ proposal: TransactionProposal) {
